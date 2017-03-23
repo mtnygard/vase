@@ -42,9 +42,9 @@
     spec = <'spec'> s-expr
 
     Query = <'query'> keyword-name QueryClause*
-    <QueryClause> = to | given | find | where
-    given = <'given'> keyword-name
-    find  = <'find'> ( s-expr / clojure-tok )
+    <QueryClause> = to | given | find | where | headers
+    given = <'given'> keyword-name+
+    find  = <'find'> ( s-expr / clojure-tok )+
     where = <'where'> vec-expr+
 
     from = <'from'> keyword-name
@@ -59,11 +59,11 @@
     url-expr = <'url'> s-expr
 
     s-expr = list-expr | vec-expr | map-expr | reader-macro | clojure-tok
-    <list-expr> = '(' (s-expr / clojure-tok)* ')'
-    <vec-expr> = '[' (s-expr / clojure-tok)* ']'
-    <map-expr> = '{' (s-expr / clojure-tok)* '}'
-    <reader-macro> = '#(' (s-expr / clojure-tok)* ')'
-    <clojure-tok> = #\"[#a-zA-Z?':_\\-0-9*+&%^.,/\\\"<>=]+\"
+    list-expr = '(' (s-expr / clojure-tok)* ')'
+    vec-expr = '[' (s-expr / clojure-tok)* ']'
+    map-expr = '{' (s-expr / clojure-tok)* '}'
+    reader-macro = '#(' (s-expr / clojure-tok)* ')'
+    clojure-tok = #\"[#a-zA-Z?':_\\-0-9*+&%^.,/\\\"<>=]+\"
 
     quotedstring = #'\"[^\"]*\"'
     keyword-name = qualified-name
@@ -81,17 +81,28 @@
   [& pairs]
   [:headers (reduce #(apply assoc %1 %2) {} (partition 2 pairs))])
 
-(defn native
-  [s-expr]
-  (let [m (meta s-expr)]
+(defn- snip-input
+  [node]
+  (when-let [m (meta node)]
     (read-string (subs *input*
                        (inc (:instaparse.gll/start-index m))
                        (:instaparse.gll/end-index m)))))
+
+(defn native
+  ([expr]
+   (snip-input expr))
+  ([expr & exprs]
+   (mapv snip-input (list* expr exprs))))
 
 (defn keyed
   [k f]
   (fn [& args]
     [k (apply f args)]))
+
+(defn val-mapped
+  [m]
+  (fn [& args]
+    (zipmap (keys m) (map #(apply % args) (vals m)))))
 
 (def transforms
   {:integer          #(Integer. %)
@@ -118,6 +129,11 @@
                        (lit/map->InterceptAction (into {:name nm} clauses)))
    :Conform          (fn [nm & clauses]
                        (lit/map->ConformAction (into {:name nm} clauses)))
+   :Query            (fn [nm & clauses]
+                       (let [datomic-query-frags (select-keys (into {} clauses) [:find :in :where])
+                             remaining (into {:name nm :query datomic-query-frags} clauses)
+                             remaining (reduce dissoc remaining [:find :in :where])]
+                         (lit/map->QueryAction remaining)))
    :params           (keyed :params vector)
    :edn-coerce       (keyed :edn-coerce vector)
    :headers          maplike
@@ -125,6 +141,10 @@
    :url-literal      (keyed :url identity)
    :url-expr         (keyed :url native)
    :spec             (keyed :spec native)
+   :find             (keyed :find native)
+   :where            (keyed :where native)
+   :given            (val-mapped {:in     (fn [& ids] (into ['$] (map #(symbol (str "?" (name %))) ids)) )
+                                  :params vectorize})
    :EnterClause      (keyed :enter native)
    :LeaveClause      (keyed :leave native)
    :ErrorClause      (keyed :error native)})

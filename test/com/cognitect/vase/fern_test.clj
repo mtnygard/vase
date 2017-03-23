@@ -146,18 +146,15 @@
       (lit/map->ConformAction {:name :aname :from :this-key :to :that-key :spec '(clojure.spec/and string? not-empty)})
 
       "query single-result
-         find ?email
+         find ?email ?name
          where [?e :user/email ?email] [?e :user/id ?id]
          given id
          to    result-key"
-      (lit/map->QueryAction {:name  :single-result
-                             :query '[:find ?email ?name
-                                      :in $ ?id
-                                      :where [?e :user/email ?email]
-                                      [?e :user/id ?id]]
-                             :to    :result-key})
+      (lit/map->QueryAction '{:name   :single-result
+                              :query  {:find [?email ?name]
+                                       :in [$ ?id]
+                                       :where [[?e :user/email ?email]
+                                               [?e :user/id ?id]]}
+                              :params [:id]
+                              :to     :result-key})
       )))
-
-
-
-(run-tests)
