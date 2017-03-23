@@ -12,6 +12,8 @@
                  ;; Pedestal
                  [io.pedestal/pedestal.service "0.5.2"]
 
+                 [instaparse "1.4.5"]
+
                  ;; Cleanup
                  [commons-codec "1.10"]
                  [cheshire "5.6.3"]]

@@ -421,3 +421,14 @@
 
     :action-literal
     :vase/transact}))
+
+(defn intercept-action
+  "Returns a Pedestal interceptor defined by the forms passed as parameters"
+  [name enter leave error]
+  (dynamic-interceptor
+   name
+   :intercept
+   {:enter          enter
+    :leave          leave
+    :error          error
+    :action-literal :vase/intercept}))

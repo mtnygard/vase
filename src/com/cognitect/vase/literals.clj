@@ -159,21 +159,16 @@
 (defmethod print-method TransactAction [t ^java.io.Writer w]
   (.write w (str "#vase/transact" (into {} t))))
 
-(defn- handle-intercept-option [x]
-  (cond
-    (list? x) (eval x)
-    (symbol? x) (resolve x)
-    (var? x) (deref x)
-    :else x))
+(defrecord InterceptAction [name enter leave error doc]
+  i/IntoInterceptor
+  (-interceptor [_]
+    (actions/intercept-action name enter leave error)))
 
 (defn intercept [form]
   {:pre [(map? form)
          (:name form)
          (-> form :name keyword?)]}
-   (let [enter (handle-intercept-option (:enter form))
-         leave (handle-intercept-option (:leave form))
-         error (handle-intercept-option (:leave form))]
-     (i/interceptor {:name (:name form)
-                     :enter enter
-                     :leave leave
-                     :error error})))
+  (map->InterceptAction form))
+
+(defmethod print-method InterceptAction [t ^java.io.Writer w]
+  (.write w (str "#vase/intercept" (into {} t))))

@@ -1,0 +1,28 @@
+;; use pedestal.views
+
+http
+  port 8080
+  api use example/v1
+  ;;  api include "foo"
+  ;;  interceptor use [authentication session]
+
+schema example/base
+  attribute user/name string one "This is a name"
+
+schema example/schema
+  schema use example/base
+
+api example/v1
+  schema use example/schema
+  schema
+    attribute user/id string one identity "The user's ID"
+  get "/user"       get-all-users
+  get "/user/:name" [require-authentication get-user (view sample.vase.v1/users-page)]
+
+interceptor authenticated?
+  native (fn [ctx] (assoc ctx :authenticated? false)
+
+query get-user
+  find *
+  where [?e :user/name ?name]
+  given name
