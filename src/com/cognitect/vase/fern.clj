@@ -49,7 +49,8 @@
     to = <'to'> keyword-name
 
     status = <'status'> integer
-    params = <'params'> <'['> keyword-name+ <']'>
+    params = <'params'> <'['> (keyword-name | param-with-default)+ <']'>
+    param-with-default = <'['> keyword-name clojure-tok <']'>
     headers = <'headers'> <'{'> ( quotedstring quotedstring )+ <'}'>
     edn-coerce = <'edn-coerce'> <'['> keyword-name+ <']'>
     body = <'body'> s-expr
@@ -103,43 +104,44 @@
     (zipmap (keys m) (map #(apply % args) (vals m)))))
 
 (def transforms
-  {:integer          #(Integer. %)
-   :name             symbolify
-   :namespace        symbolify
-   :qualified-name   (fn
-                       ([nm-part]         nm-part)
-                       ([ns-part nm-part] (symbol (str ns-part) (str nm-part))))
-   :keyword-name     keyword
-   :cardinality      (fn [s] (keyword "db.cardinality" s))
-   :kind             (fn [s] (keyword "db.type" s))
-   :quotedstring     (fn [s] (apply str (drop 1 (butlast s))))
-   :toggle           keyword
-   :Verb             keyword
-   :InterceptQueue   identity
-   :InterceptorRef   vector
-   :InterceptorRefs  vectorize
-   :StockInterceptor identity
-   :Respond          (fn [nm & clauses]
-                       (lit/map->RespondAction (into {:name nm} clauses)))
-   :Redirect         (fn [nm & clauses]
-                       (lit/map->RedirectAction (into {:name nm} clauses)))
-   :Interceptor      (fn [nm & clauses]
-                       (lit/map->InterceptAction (into {:name nm} clauses)))
-   :Conform          (fn [nm & clauses]
-                       (lit/map->ConformAction (into {:name nm} clauses)))
-   :Query            (fn [nm & clauses]
-                       (lit/map->QueryAction (into {:name nm} clauses)))
-   :params           (keyed :params vector)
-   :edn-coerce       (keyed :edn-coerce vector)
-   :headers          maplike
-   :body             (keyed :body native)
-   :url-literal      (keyed :url identity)
-   :url-expr         (keyed :url native)
-   :spec             (keyed :spec native)
-   :q                (keyed :query native)
-   :EnterClause      (keyed :enter native)
-   :LeaveClause      (keyed :leave native)
-   :ErrorClause      (keyed :error native)})
+  {:integer            #(Integer. %)
+   :name               symbolify
+   :namespace          symbolify
+   :qualified-name     (fn
+                         ([nm-part]         nm-part)
+                         ([ns-part nm-part] (symbol (str ns-part) (str nm-part))))
+   :keyword-name       keyword
+   :cardinality        (fn [s] (keyword "db.cardinality" s))
+   :kind               (fn [s] (keyword "db.type" s))
+   :quotedstring       (fn [s] (apply str (drop 1 (butlast s))))
+   :toggle             keyword
+   :Verb               keyword
+   :InterceptQueue     identity
+   :InterceptorRef     vector
+   :InterceptorRefs    vectorize
+   :StockInterceptor   identity
+   :Respond            (fn [nm & clauses]
+                         (lit/map->RespondAction (into {:name nm} clauses)))
+   :Redirect           (fn [nm & clauses]
+                         (lit/map->RedirectAction (into {:name nm} clauses)))
+   :Interceptor        (fn [nm & clauses]
+                         (lit/map->InterceptAction (into {:name nm} clauses)))
+   :Conform            (fn [nm & clauses]
+                         (lit/map->ConformAction (into {:name nm} clauses)))
+   :Query              (fn [nm & clauses]
+                         (lit/map->QueryAction (into {:name nm} clauses)))
+   :params             (keyed :params vector)
+   :param-with-default (fn [nm default] (vector nm (native default)))
+   :edn-coerce         (keyed :edn-coerce vector)
+   :headers            maplike
+   :body               (keyed :body native)
+   :url-literal        (keyed :url identity)
+   :url-expr           (keyed :url native)
+   :spec               (keyed :spec native)
+   :q                  (keyed :query native)
+   :EnterClause        (keyed :enter native)
+   :LeaveClause        (keyed :leave native)
+   :ErrorClause        (keyed :error native)})
 
 (defn transform
   [parse-tree]

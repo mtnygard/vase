@@ -14,7 +14,7 @@
 
 (deftest parse-fern
   (testing "names"
-    (are [input expected] (= expected (fern/transform (insta/parse fern/fern-parser input :start :qualified-name)))
+    (are [input expected] (= expected (fern/parse-string input :qualified-name))
       "example"              'example
       "example.part"         'example.part
       "ns1.ns2/example.part" 'ns1.ns2/example.part
@@ -25,8 +25,23 @@
       "inner$classlike"      'inner$classlike
       "a100%"                'a100%))
 
+  (testing "params"
+    (are [input expected] (= expected (fern/parse-string input :params))
+      "params [id1]"
+      [:params [:id1]]
+
+      "params [ns/id1]"
+      [:params [:ns/id1]]
+
+      "params [id1 id2 id3]"
+      [:params [:id1 :id2 :id3]]
+
+      "params [[with-default 0] no-default [string-default \"s\"]]"
+      [:params [[:with-default 0] :no-default [:string-default "s"]]]
+      ))
+
   (testing "schema fragments"
-    (are [input expected] (= expected (fern/transform (insta/parse fern/fern-parser input :start :Schema)))
+    (are [input expected] (= expected (fern/parse-string input :Schema))
       "schema example/base"
       [:Schema 'example/base]
 
@@ -50,7 +65,7 @@
        [:Attribute :user/friends :db.cardinality/many :db.type/ref "Connections"]]))
 
   (testing "api fragments"
-    (are [input expected] (= expected (fern/transform (insta/parse fern/fern-parser input :start :Api)))
+    (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/user"
       [:Api 'example/user]
 
