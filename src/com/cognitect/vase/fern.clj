@@ -42,10 +42,8 @@
     spec = <'spec'> s-expr
 
     Query = <'query'> keyword-name QueryClause*
-    <QueryClause> = to | given | find | where | headers
-    given = <'given'> keyword-name+
-    find  = <'find'> ( s-expr / clojure-tok )+
-    where = <'where'> vec-expr+
+    <QueryClause> = to | headers | q | params
+    q = <'q'> s-expr
 
     from = <'from'> keyword-name
     to = <'to'> keyword-name
@@ -63,7 +61,7 @@
     vec-expr = '[' (s-expr / clojure-tok)* ']'
     map-expr = '{' (s-expr / clojure-tok)* '}'
     reader-macro = '#(' (s-expr / clojure-tok)* ')'
-    clojure-tok = #\"[#a-zA-Z?':_\\-0-9*+&%^.,/\\\"<>=]+\"
+    clojure-tok = #\"[#a-zA-Z?'.:_\\-0-9*+$&%^.,/\\\"<>=]+\"
 
     quotedstring = #'\"[^\"]*\"'
     keyword-name = qualified-name
@@ -130,10 +128,7 @@
    :Conform          (fn [nm & clauses]
                        (lit/map->ConformAction (into {:name nm} clauses)))
    :Query            (fn [nm & clauses]
-                       (let [datomic-query-frags (select-keys (into {} clauses) [:find :in :where])
-                             remaining (into {:name nm :query datomic-query-frags} clauses)
-                             remaining (reduce dissoc remaining [:find :in :where])]
-                         (lit/map->QueryAction remaining)))
+                       (lit/map->QueryAction (into {:name nm} clauses)))
    :params           (keyed :params vector)
    :edn-coerce       (keyed :edn-coerce vector)
    :headers          maplike
@@ -141,10 +136,7 @@
    :url-literal      (keyed :url identity)
    :url-expr         (keyed :url native)
    :spec             (keyed :spec native)
-   :find             (keyed :find native)
-   :where            (keyed :where native)
-   :given            (val-mapped {:in     (fn [& ids] (into ['$] (map #(symbol (str "?" (name %))) ids)) )
-                                  :params vectorize})
+   :q                (keyed :query native)
    :EnterClause      (keyed :enter native)
    :LeaveClause      (keyed :leave native)
    :ErrorClause      (keyed :error native)})

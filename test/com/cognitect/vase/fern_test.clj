@@ -146,15 +146,47 @@
       (lit/map->ConformAction {:name :aname :from :this-key :to :that-key :spec '(clojure.spec/and string? not-empty)})
 
       "query single-result
-         find ?email ?name
-         where [?e :user/email ?email] [?e :user/id ?id]
-         given id
-         to    result-key"
-      (lit/map->QueryAction '{:name   :single-result
-                              :query  {:find [?email ?name]
-                                       :in [$ ?id]
-                                       :where [[?e :user/email ?email]
-                                               [?e :user/id ?id]]}
-                              :params [:id]
-                              :to     :result-key})
-      )))
+         q      [:find ?email ?name :in $ ?id :where [?e :user/email ?email] [?e :user/id ?id]]
+         params [id]
+         to     result-key"
+      (lit/map->QueryAction {:name   :single-result
+                             :query  '[:find ?email ?name :in $ ?id :where [?e :user/email ?email] [?e :user/id ?id]]
+                                       :params [:id]
+                                       :to     :result-key})
+
+      "query binding-form
+         q [:find ?release-name
+            :in $ ?artist-name
+            :where [?artist :artist/name ?artist-name]
+                   [?release :release/artists ?artist]
+                   [?release :release/name ?release-name]]
+         params [artist-name]"
+      (lit/map->QueryAction {:name   :binding-form
+                             :params [:artist-name]
+                             :query  '[:find ?release-name
+                                       :in $ ?artist-name
+                                       :where [?artist :artist/name ?artist-name]
+                                       [?release :release/artists ?artist]
+                                       [?release :release/name ?release-name]]})
+
+      "query scalar-result
+         q      [:find ?year . :in $ ?name :where [?artist :artist/name ?name] [?artist :artist/startYear ?year]]
+         params [name]"
+      (lit/map->QueryAction {:name   :scalar-result
+                             :params [:name]
+                             :query  '[:find ?year . :in $ ?name :where [?artist :artist/name ?name] [?artist :artist/startYear ?year]]})
+
+      "query params-differ-from-lvars
+         q     [:find  ?release
+                :in    $ [?aname ?rname]
+                :where [?artist :artist/name ?aname]
+                       [?release :release/artists ?artist]
+                       [?release :release/name ?rname]]
+         params [artist-release-pairs]"
+      (lit/map->QueryAction {:name   :params-differ-from-lvars
+                             :query  '[:find  ?release
+                                       :in    $ [?aname ?rname]
+                                       :where [?artist :artist/name ?aname]
+                                       [?release :release/artists ?artist]
+                                       [?release :release/name ?rname]]
+                             :params [:artist-release-pairs]}))))
