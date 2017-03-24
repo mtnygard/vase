@@ -48,8 +48,7 @@
       [:params [:id1 :id2 :id3]]
 
       "params [[with-default 0] no-default [string-default \"s\"]]"
-      [:params [[:with-default 0] :no-default [:string-default "s"]]]
-      ))
+      [:params [[:with-default 0] :no-default [:string-default "s"]]]))
 
   (testing "schema fragments"
     (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
@@ -105,37 +104,41 @@
   (testing "api fragments"
     (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/user"
-      [:Api 'example/user]
+      {:example/user {:vase.api/routes nil}}
 
       "api example/one-route
         get \"/foo\"  one-interceptor"
-      [:Api 'example/one-route
-       [:Route :get "/foo" ['one-interceptor]]]
+      {:example/one-route
+       {:vase.api/routes
+        {"/foo" {:get ['one-interceptor]}}}}
 
       "api example/one-route
         get \"/foo\"  [an-interceptor another-interceptor]"
-      [:Api 'example/one-route
-       [:Route :get "/foo" ['an-interceptor 'another-interceptor]]]
+      {:example/one-route
+       {:vase.api/routes
+        {"/foo" {:get ['an-interceptor 'another-interceptor]}}}}
 
       "api example/verbs
         get  \"/foo\" one-action
         put  \"/foo\" different-action
         post \"/foo\" other-action"
-      [:Api 'example/verbs
-       [:Route :get  "/foo" ['one-action]]
-       [:Route :put  "/foo" ['different-action]]
-       [:Route :post "/foo" ['other-action]]]
+      {:example/verbs
+       {:vase.api/routes
+        {"/foo" {:get ['one-action]
+                 :put ['different-action]
+                 :post ['other-action]}}}}
 
       "api multiple/routes
         get \"/users\" list-users
         post \"/users\" create-user
         get \"/users/:id\" show-user
         delete \"/users/:id\" delete-user"
-      [:Api 'multiple/routes
-       [:Route :get "/users" ['list-users]]
-       [:Route :post "/users" ['create-user]]
-       [:Route :get "/users/:id" ['show-user]]
-       [:Route :delete "/users/:id" ['delete-user]]]))
+      {:multiple/routes
+       {:vase.api/routes
+        {"/users"     {:get  ['list-users]
+                       :post ['create-user]}
+         "/users/:id" {:get    ['show-user]
+                       :delete ['delete-user]}}}}))
 
   (testing "stock interceptors"
     (are [input expected] (= expected (fern/parse-string input :StockInterceptor))

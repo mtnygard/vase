@@ -15,7 +15,7 @@
     kind = 'long' | 'double' | 'instant' | 'ref' | 'bigint' | 'float' | 'string' | 'keyword' | 'bigdec' | 'bytes' | 'uri' | 'uuid' | 'boolean'
     toggle = 'unique' | 'identity' | 'index' | 'fulltext' | 'component' | 'no-history'
 
-    Api = <'api'> qualified-name Route*
+    Api = <'api'> keyword-name Route*
     Route = Verb Path InterceptQueue
     Verb = 'get' | 'put' | 'post' | 'delete' | 'head' | 'options'
     <Path> = quotedstring
@@ -129,6 +129,10 @@
    :kind               keyword
    :toggle             keyword
    :Schema             (fn [nm & attrs] {nm {:vase.norm/txes attrs}})
+   :Api                (fn [nm & routes] {nm
+                                          {:vase.api/routes
+                                           (apply merge-with merge routes)}})
+   :Route              (fn [verb path ints] {path {verb ints}})
    :Verb               keyword
    :InterceptQueue     identity
    :InterceptorRef     vector
