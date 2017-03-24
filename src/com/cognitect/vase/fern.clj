@@ -7,7 +7,7 @@
 
 (def fern-parser
   (insta/parser
-   "Description = Schema*
+   "Description = ( Schema | Api | Spec )*
     Schema = <'schema'> keyword-name Attribute*
 
     Attribute = <'attribute'> keyword-name cardinality kind toggle* quotedstring
@@ -38,8 +38,8 @@
     ErrorClause = <'error'> s-expr
 
     Conform = <'conform'> keyword-name ConformClause*
-    <ConformClause> = from | to | spec
-    spec = <'spec'> s-expr
+    <ConformClause> = from | to | with-spec
+    with-spec = <'with-spec'> s-expr
 
     Query = <'query'> keyword-name QueryClause*
     <QueryClause> = to | headers | q | params
@@ -60,6 +60,8 @@
     body = <'body'> s-expr
     url-literal = <'url'> quotedstring
     url-expr = <'url'> s-expr
+
+    Spec = <'spec'> keyword-name s-expr
 
     s-expr = list-expr | vec-expr | map-expr | reader-macro | clojure-tok
     list-expr = '(' (s-expr / clojure-tok)* ')'
@@ -86,7 +88,7 @@
 
 (defn- maplike
   [& pairs]
-  [:headers (reduce #(apply assoc %1 %2) {} (partition 2 pairs))])
+  (reduce #(apply assoc %1 %2) {} (partition 2 pairs)))
 
 (defn- snip-input
   [node]
@@ -132,6 +134,7 @@
    :Api                (fn [nm & routes] {nm
                                           {:vase.api/routes
                                            (apply merge-with merge routes)}})
+   :Spec               (fn [nm spec] (println :specognized spec)   {nm (native spec)})
    :Route              (fn [verb path ints] {path {verb ints}})
    :Verb               keyword
    :InterceptQueue     identity
@@ -153,11 +156,11 @@
    :params             (keyed :params vector)
    :param-with-default (fn [nm default] (vector nm (native default)))
    :edn-coerce         (keyed :edn-coerce vector)
-   :headers            maplike
+   :headers            (keyed :headers maplike)
    :body               (keyed :body native)
    :url-literal        (keyed :url identity)
    :url-expr           (keyed :url native)
-   :spec               (keyed :spec native)
+   :with-spec          (keyed :spec native)
    :q                  (keyed :query native)
    :EnterClause        (keyed :enter native)
    :LeaveClause        (keyed :leave native)

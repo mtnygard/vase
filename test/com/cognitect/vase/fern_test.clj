@@ -197,7 +197,7 @@
 
       "conform aname
          from this-key
-         spec (clojure.spec/and string? not-empty)
+         with-spec (clojure.spec/and string? not-empty)
          to   that-key"
       (lit/map->ConformAction {:name :aname :from :this-key :to :that-key :spec '(clojure.spec/and string? not-empty)})
 
@@ -261,4 +261,10 @@
       "transact record-input
          params [an-input]"
       (lit/map->TransactAction {:name :record-input
-                                :properties [:an-input]}))))
+                                :properties [:an-input]}))
+
+    (testing "specs"
+      (are [input expected] (= expected (fern/parse-string input :Spec))
+        "spec example.test/age
+          (fn [age] (> age 21))"
+        {:example.test/age '(fn [age] (> age 21))}))))
