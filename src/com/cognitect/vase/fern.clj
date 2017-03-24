@@ -8,7 +8,7 @@
 (def fern-parser
   (insta/parser
    "Description = Schema*
-    Schema = <'schema'> qualified-name Attribute*
+    Schema = <'schema'> keyword-name Attribute*
 
     Attribute = <'attribute'> keyword-name cardinality kind toggle* quotedstring
     cardinality = 'one' | 'many'
@@ -77,6 +77,10 @@
     <ident> = #'[A-Za-z_][A-Za-z0-9_\\-\\?!$\\%]*'
 "  :auto-whitespace :standard))
 
+(defn- build-attribute
+  [& attr-vec]
+  (lit/parse-schema-vec attr-vec))
+
 (defn- vectorize [& xs] (vec xs))
 (defn- symbolify [& parts] (symbol (apply str parts)))
 
@@ -119,10 +123,12 @@
                          ([nm-part]         nm-part)
                          ([ns-part nm-part] (symbol (str ns-part) (str nm-part))))
    :keyword-name       keyword
-   :cardinality        (fn [s] (keyword "db.cardinality" s))
-   :kind               (fn [s] (keyword "db.type" s))
    :quotedstring       (fn [s] (apply str (drop 1 (butlast s))))
+   :Attribute          build-attribute
+   :cardinality        keyword
+   :kind               keyword
    :toggle             keyword
+   :Schema             (fn [nm & attrs] {nm {:vase.norm/txes attrs}})
    :Verb               keyword
    :InterceptQueue     identity
    :InterceptorRef     vector

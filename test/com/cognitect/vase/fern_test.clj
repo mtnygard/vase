@@ -6,11 +6,22 @@
             [io.pedestal.interceptor :as i]
             [com.cognitect.vase.literals :as lit]))
 
-(def sample-descriptor (slurp (io/resource "descriptor_in_dsl.fern")))
+(defn map-vals
+  [f m]
+  (with-meta
+    (reduce-kv
+     #(assoc %1 %2 (f %3))
+     {}
+     m)
+    (meta m)))
 
-(defn- as-interceptor
-  [input]
-  (fern/transform (insta/parse fern/fern-parser input :start :StockInterceptor)))
+(defn- remove-tempids
+  [entities]
+  (map (fn [entity] (dissoc entity :db/id)) entities))
+
+(defn- remove-tempids-from-norm
+  [norm]
+  (update norm :vase.norm/txes remove-tempids))
 
 (deftest parse-fern
   (testing "names"
@@ -41,28 +52,55 @@
       ))
 
   (testing "schema fragments"
-    (are [input expected] (= expected (fern/parse-string input :Schema))
+    (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
       "schema example/base"
-      [:Schema 'example/base]
+      {:example/base {:vase.norm/txes ()}}
 
       "schema example/base
          attribute user/name one string \"This is a doc\""
-      [:Schema 'example/base
-       [:Attribute :user/name :db.cardinality/one :db.type/string "This is a doc"]]
+      {:example/base
+       {:vase.norm/txes
+        [{:db/ident :user/name,
+          :db/valueType :db.type/string,
+          :db/cardinality :db.cardinality/one,
+          :db.install/_attribute :db.part/db,
+          :db/doc "This is a doc"}]}}
 
-      "schema dotted.name
+      "schema with-toggles
        attribute people.user/username one string identity fulltext no-history \"An attribute with toggles\""
-      [:Schema 'dotted.name
-       [:Attribute :people.user/username :db.cardinality/one :db.type/string :identity :fulltext :no-history "An attribute with toggles"]]
+      {:with-toggles
+       {:vase.norm/txes
+        [{:db/index true,
+          :db/unique :db.unique/identity,
+          :db/valueType :db.type/string,
+          :db/noHistory true,
+          :db.install/_attribute :db.part/db,
+          :db/fulltext true,
+          :db/cardinality :db.cardinality/one,
+          :db/doc "An attribute with toggles",
+          :db/ident :people.user/username}]}}
 
       "schema multiple-attributes
          attribute user/id one long \"Numeric ID\"
          attribute user/name one string \"Printable\"
          attribute user/friends many ref \"Connections\""
-      [:Schema 'multiple-attributes
-       [:Attribute :user/id :db.cardinality/one :db.type/long "Numeric ID"]
-       [:Attribute :user/name :db.cardinality/one :db.type/string "Printable"]
-       [:Attribute :user/friends :db.cardinality/many :db.type/ref "Connections"]]))
+      {:multiple-attributes
+       {:vase.norm/txes
+        [{:db/ident :user/id,
+          :db/valueType :db.type/long,
+          :db/cardinality :db.cardinality/one,
+          :db.install/_attribute :db.part/db,
+          :db/doc "Numeric ID"}
+         {:db/ident :user/name,
+          :db/valueType :db.type/string,
+          :db/cardinality :db.cardinality/one,
+          :db.install/_attribute :db.part/db,
+          :db/doc "Printable"}
+         {:db/ident :user/friends,
+          :db/valueType :db.type/ref,
+          :db/cardinality :db.cardinality/many,
+          :db.install/_attribute :db.part/db,
+          :db/doc "Connections"}]}}))
 
   (testing "api fragments"
     (are [input expected] (= expected (fern/parse-string input :Api))
@@ -166,8 +204,8 @@
          to     result-key"
       (lit/map->QueryAction {:name   :single-result
                              :query  '[:find ?email ?name :in $ ?id :where [?e :user/email ?email] [?e :user/id ?id]]
-                                       :params [:id]
-                                       :to     :result-key})
+                             :params [:id]
+                             :to     :result-key})
 
       "query binding-form
          q [:find ?release-name
@@ -220,5 +258,4 @@
       "transact record-input
          params [an-input]"
       (lit/map->TransactAction {:name :record-input
-                                :properties [:an-input]})
-      )))
+                                :properties [:an-input]}))))
