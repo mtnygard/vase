@@ -23,7 +23,7 @@
     InterceptorRef = qualified-name
     InterceptorRefs = <'['> qualified-name+ <']'>
 
-    StockInterceptor = Respond | Redirect | Interceptor | Conform | Query
+    StockInterceptor = Respond | Redirect | Interceptor | Conform | Query | Transact
 
     Respond = <'respond'> keyword-name RespondClause*
     <RespondClause> = status | params | headers | edn-coerce | body
@@ -44,6 +44,10 @@
     Query = <'query'> keyword-name QueryClause*
     <QueryClause> = to | headers | q | params
     q = <'q'> s-expr
+
+    Transact = <'transact'> keyword-name TransactClause*
+    <TransactClause> = to | headers | params | operation
+    operation = <'operation'> keyword-name
 
     from = <'from'> keyword-name
     to = <'to'> keyword-name
@@ -87,21 +91,25 @@
                        (inc (:instaparse.gll/start-index m))
                        (:instaparse.gll/end-index m)))))
 
-(defn native
+(defn- native
   ([expr]
    (snip-input expr))
   ([expr & exprs]
    (mapv snip-input (list* expr exprs))))
 
-(defn keyed
+(defn- keyed
   [k f]
   (fn [& args]
     [k (apply f args)]))
 
-(defn val-mapped
+(defn- val-mapped
   [m]
   (fn [& args]
     (zipmap (keys m) (map #(apply % args) (vals m)))))
+
+(defn- rename-key
+  [m old new]
+  (dissoc (assoc m new (m old)) old))
 
 (def transforms
   {:integer            #(Integer. %)
@@ -130,6 +138,8 @@
                          (lit/map->ConformAction (into {:name nm} clauses)))
    :Query              (fn [nm & clauses]
                          (lit/map->QueryAction (into {:name nm} clauses)))
+   :Transact           (fn [nm & clauses]
+                         (lit/map->TransactAction (rename-key (into {:name nm} clauses) :params :properties)))
    :params             (keyed :params vector)
    :param-with-default (fn [nm default] (vector nm (native default)))
    :edn-coerce         (keyed :edn-coerce vector)

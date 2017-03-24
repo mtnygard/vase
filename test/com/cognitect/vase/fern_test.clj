@@ -204,4 +204,21 @@
                                        :where [?artist :artist/name ?aname]
                                        [?release :release/artists ?artist]
                                        [?release :release/name ?rname]]
-                             :params [:artist-release-pairs]}))))
+                             :params [:artist-release-pairs]})
+
+      "transact create-user
+         params     [user/email user/name user/country]
+         operation  vase/assert-entity
+         headers    {\"Powered-by\" \"Vase\"}
+         to         transaction-result"
+      (lit/map->TransactAction {:name :create-user
+                                :properties [:user/email :user/name :user/country]
+                                :operation  :vase/assert-entity
+                                :headers    {"Powered-by" "Vase"}
+                                :to         :transaction-result})
+
+      "transact record-input
+         params [an-input]"
+      (lit/map->TransactAction {:name :record-input
+                                :properties [:an-input]})
+      )))
