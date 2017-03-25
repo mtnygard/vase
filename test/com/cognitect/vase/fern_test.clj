@@ -21,7 +21,9 @@
 
 (defn- remove-tempids-from-norm
   [norm]
-  (update norm :vase.norm/txes remove-tempids))
+  (cond-> norm
+    (:vase.norm/txes norm)
+    (update :vase.norm/txes remove-tempids)))
 
 (deftest parse-fern
   (testing "names"
@@ -53,31 +55,31 @@
   (testing "schema fragments"
     (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
       "schema example/base"
-      {:example/base {:vase.norm/txes ()}}
+      {:example/base {}}
 
       "schema example/base
          attribute user/name one string \"This is a doc\""
       {:example/base
        {:vase.norm/txes
-        [{:db/ident :user/name,
-          :db/valueType :db.type/string,
-          :db/cardinality :db.cardinality/one,
-          :db.install/_attribute :db.part/db,
-          :db/doc "This is a doc"}]}}
+        [{:db/ident              :user/name
+          :db/valueType          :db.type/string
+          :db/cardinality        :db.cardinality/one
+          :db.install/_attribute :db.part/db
+          :db/doc                "This is a doc"}]}}
 
       "schema with-toggles
        attribute people.user/username one string identity fulltext no-history \"An attribute with toggles\""
       {:with-toggles
        {:vase.norm/txes
-        [{:db/index true,
-          :db/unique :db.unique/identity,
-          :db/valueType :db.type/string,
-          :db/noHistory true,
-          :db.install/_attribute :db.part/db,
-          :db/fulltext true,
-          :db/cardinality :db.cardinality/one,
-          :db/doc "An attribute with toggles",
-          :db/ident :people.user/username}]}}
+        [{:db/index              true
+          :db/unique             :db.unique/identity
+          :db/valueType          :db.type/string
+          :db/noHistory          true
+          :db.install/_attribute :db.part/db
+          :db/fulltext           true
+          :db/cardinality        :db.cardinality/one
+          :db/doc                "An attribute with toggles"
+          :db/ident              :people.user/username}]}}
 
       "schema multiple-attributes
          attribute user/id one long \"Numeric ID\"
@@ -85,21 +87,21 @@
          attribute user/friends many ref \"Connections\""
       {:multiple-attributes
        {:vase.norm/txes
-        [{:db/ident :user/id,
-          :db/valueType :db.type/long,
-          :db/cardinality :db.cardinality/one,
-          :db.install/_attribute :db.part/db,
-          :db/doc "Numeric ID"}
-         {:db/ident :user/name,
-          :db/valueType :db.type/string,
-          :db/cardinality :db.cardinality/one,
-          :db.install/_attribute :db.part/db,
-          :db/doc "Printable"}
-         {:db/ident :user/friends,
-          :db/valueType :db.type/ref,
-          :db/cardinality :db.cardinality/many,
-          :db.install/_attribute :db.part/db,
-          :db/doc "Connections"}]}}))
+        [{:db/ident              :user/id
+          :db/valueType          :db.type/long
+          :db/cardinality        :db.cardinality/one
+          :db.install/_attribute :db.part/db
+          :db/doc                "Numeric ID"}
+         {:db/ident              :user/name
+          :db/valueType          :db.type/string
+          :db/cardinality        :db.cardinality/one
+          :db.install/_attribute :db.part/db
+          :db/doc                "Printable"}
+         {:db/ident              :user/friends
+          :db/valueType          :db.type/ref
+          :db/cardinality        :db.cardinality/many
+          :db.install/_attribute :db.part/db
+          :db/doc                "Connections"}]}}))
 
   (testing "api fragments"
     (are [input expected] (= expected (fern/parse-string input :Api))
@@ -288,5 +290,30 @@
          get \"/users/:id\" get-user"
       {:example/v3 {:vase.api/schemas [:example/base :store/item]
                     :vase.api/routes  {"/users"     {:get ['list-users]}
-                                       "/users/:id" {:get ['get-user]}}}}
+                                       "/users/:id" {:get ['get-user]}}}}))
+
+  (testing "schemas can use schemas"
+    (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
+      "schema example/user
+         schema use example/base"
+      {:example/user {:vase.norm/requires [:example/base]}}
+
+      "schema example/user
+         schema use example/base
+         attribute user/name one string identity \"The user\"
+         schema use persona/enums
+         attribute user/persona one ref \"Ref to a persona enum\""
+      {:example/user
+       {:vase.norm/requires [:example/base :persona/enums]
+        :vase.norm/txes [{:db/ident              :user/name
+                          :db/valueType          :db.type/string
+                          :db/cardinality        :db.cardinality/one
+                          :db.install/_attribute :db.part/db
+                          :db/doc                "The user"
+                          :db/unique             :db.unique/identity}
+                         {:db/ident              :user/persona
+                          :db/valueType          :db.type/ref
+                          :db/cardinality        :db.cardinality/one
+                          :db.install/_attribute :db.part/db
+                          :db/doc                "Ref to a persona enum"}]}}
       )))

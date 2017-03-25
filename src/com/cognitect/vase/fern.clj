@@ -8,7 +8,7 @@
 (def fern-parser
   (insta/parser
    "Description = ( Schema | Api | Spec )*
-    Schema = <'schema'> keyword-name Attribute*
+    Schema = <'schema'> keyword-name (Attribute | SchemaUse)*
 
     Attribute = <'attribute'> keyword-name cardinality kind toggle* quotedstring
     cardinality = 'one' | 'many'
@@ -132,7 +132,16 @@
    :cardinality        keyword
    :kind               keyword
    :toggle             keyword
-   :Schema             (fn [nm & attrs] {nm {:vase.norm/txes attrs}})
+   :Schema             (fn [nm & parts]
+                         (let [schemas (filter #(= :schema (first %)) parts)
+                               attrs   (remove #(= :schema (first %)) parts)]
+                           {nm
+                            (cond-> {}
+                              (seq schemas)
+                              (assoc :vase.norm/requires (into [] (map second schemas)))
+
+                              (seq attrs)
+                              (assoc :vase.norm/txes attrs))}))
    :Api                (fn [nm & parts]
                          (let [schemas (filter #(= :schema (first %)) parts)
                                routes  (remove #(= :schema (first %)) parts)]
@@ -143,7 +152,7 @@
 
                               (seq routes)
                               (assoc :vase.api/routes (apply merge-with merge routes)))}))
-   :Spec               (fn [nm spec] (println :specognized spec)   {nm (native spec)})
+   :Spec               (fn [nm spec] {nm (native spec)})
    :SchemaUse          (keyed :schema identity)
    :Route              (fn [verb path ints] {path {verb ints}})
    :Verb               keyword
