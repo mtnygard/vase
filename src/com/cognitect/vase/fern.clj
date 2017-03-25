@@ -15,13 +15,15 @@
     kind = 'long' | 'double' | 'instant' | 'ref' | 'bigint' | 'float' | 'string' | 'keyword' | 'bigdec' | 'bytes' | 'uri' | 'uuid' | 'boolean'
     toggle = 'unique' | 'identity' | 'index' | 'fulltext' | 'component' | 'no-history'
 
-    Api = <'api'> keyword-name Route*
+    Api = <'api'> keyword-name (Route | SchemaUse)*
     Route = Verb Path InterceptQueue
     Verb = 'get' | 'put' | 'post' | 'delete' | 'head' | 'options'
     <Path> = quotedstring
     InterceptQueue = InterceptorRef | InterceptorRefs
     InterceptorRef = qualified-name
     InterceptorRefs = <'['> qualified-name+ <']'>
+
+    SchemaUse = <'schema'> <'use'> keyword-name
 
     StockInterceptor = Respond | Redirect | Interceptor | Conform | Query | Transact
 
@@ -131,10 +133,18 @@
    :kind               keyword
    :toggle             keyword
    :Schema             (fn [nm & attrs] {nm {:vase.norm/txes attrs}})
-   :Api                (fn [nm & routes] {nm
-                                          {:vase.api/routes
-                                           (apply merge-with merge routes)}})
+   :Api                (fn [nm & parts]
+                         (let [schemas (filter #(= :schema (first %)) parts)
+                               routes  (remove #(= :schema (first %)) parts)]
+                           {nm
+                            (cond-> {}
+                              (seq schemas)
+                              (assoc :vase.api/schemas (into [] (map second schemas)))
+
+                              (seq routes)
+                              (assoc :vase.api/routes (apply merge-with merge routes)))}))
    :Spec               (fn [nm spec] (println :specognized spec)   {nm (native spec)})
+   :SchemaUse          (keyed :schema identity)
    :Route              (fn [verb path ints] {path {verb ints}})
    :Verb               keyword
    :InterceptQueue     identity

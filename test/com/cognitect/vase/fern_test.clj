@@ -104,7 +104,7 @@
   (testing "api fragments"
     (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/user"
-      {:example/user {:vase.api/routes nil}}
+      {:example/user {}}
 
       "api example/one-route
         get \"/foo\"  one-interceptor"
@@ -268,3 +268,25 @@
         "spec example.test/age
           (fn [age] (> age 21))"
         {:example.test/age '(fn [age] (> age 21))}))))
+
+(deftest incorporate-by-reference
+  (testing "apis can use schemas"
+    (are [input expected] (= expected (fern/parse-string input :Api))
+      "api example/v1
+         schema use example/schema"
+      {:example/v1 {:vase.api/schemas [:example/schema]}}
+
+      "api example/v2
+         schema use example/base
+         schema use example/extensions"
+      {:example/v2 {:vase.api/schemas [:example/base :example/extensions]}}
+
+      "api example/v3
+         schema use example/base
+         get \"/users\" list-users
+         schema use store/item
+         get \"/users/:id\" get-user"
+      {:example/v3 {:vase.api/schemas [:example/base :store/item]
+                    :vase.api/routes  {"/users"     {:get ['list-users]}
+                                       "/users/:id" {:get ['get-user]}}}}
+      )))
