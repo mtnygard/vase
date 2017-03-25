@@ -15,7 +15,7 @@
     kind = 'long' | 'double' | 'instant' | 'ref' | 'bigint' | 'float' | 'string' | 'keyword' | 'bigdec' | 'bytes' | 'uri' | 'uuid' | 'boolean'
     toggle = 'unique' | 'identity' | 'index' | 'fulltext' | 'component' | 'no-history'
 
-    Api = <'api'> keyword-name (Route | SchemaUse)*
+    Api = <'api'> keyword-name (Route / SchemaUse / SchemaInline)*
     Route = Verb Path InterceptQueue
     Verb = 'get' | 'put' | 'post' | 'delete' | 'head' | 'options'
     <Path> = quotedstring
@@ -24,6 +24,7 @@
     InterceptorRefs = <'['> qualified-name+ <']'>
 
     SchemaUse = <'schema'> <'use'> keyword-name
+    SchemaInline = Schema
 
     StockInterceptor = Respond | Redirect | Interceptor | Conform | Query | Transact
 
@@ -143,18 +144,22 @@
                               (seq attrs)
                               (assoc :vase.norm/txes attrs))}))
    :Api                (fn [nm & parts]
-                         (let [schemas (filter #(= :schema (first %)) parts)
-                               routes  (remove #(= :schema (first %)) parts)]
+                         (let [{:keys [route schema schemainline]} (group-by first parts)]
+                           (println :Api :routes route)
                            {nm
                             (cond-> {}
-                              (seq schemas)
-                              (assoc :vase.api/schemas (into [] (map second schemas)))
+                              (seq schema)
+                              (assoc :vase.api/schemas (into [] (map second schema)))
 
-                              (seq routes)
-                              (assoc :vase.api/routes (apply merge-with merge routes)))}))
+                              (seq schemainline)
+                              (assoc :fern.api/schema (apply merge-with merge (map second schemainline)))
+
+                              (seq route)
+                              (assoc :vase.api/routes (apply merge-with merge (map second route))))}))
    :Spec               (fn [nm spec] {nm (native spec)})
    :SchemaUse          (keyed :schema identity)
-   :Route              (fn [verb path ints] {path {verb ints}})
+   :SchemaInline       (keyed :schemainline identity)
+   :Route              (keyed :route (fn [verb path ints] {path {verb ints}}))
    :Verb               keyword
    :InterceptQueue     identity
    :InterceptorRef     vector

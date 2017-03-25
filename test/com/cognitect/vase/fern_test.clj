@@ -25,6 +25,12 @@
     (:vase.norm/txes norm)
     (update :vase.norm/txes remove-tempids)))
 
+(defn- remove-tempids-from-nested-schema
+  [api]
+  (cond-> api
+    (:fern.api/schema api)
+    (update :fern.api/schema #(map-vals remove-tempids-from-norm %))))
+
 (deftest parse-fern
   (testing "names"
     (are [input expected] (= expected (fern/parse-string input :qualified-name))
@@ -315,5 +321,18 @@
                           :db/valueType          :db.type/ref
                           :db/cardinality        :db.cardinality/one
                           :db.install/_attribute :db.part/db
-                          :db/doc                "Ref to a persona enum"}]}}
-      )))
+                          :db/doc                "Ref to a persona enum"}]}})))
+
+(deftest incorporate-inline
+  (testing "apis can write schema inline"
+    (are [input expected] (= expected (map-vals remove-tempids-from-nested-schema (fern/parse-string input :Api)))
+      "api example/v1
+         get \"/path\" list-attr1
+         schema example/v1.attr
+           attribute attr1 one string \"An attribute\""
+      {:example/v1 {:vase.api/routes {"/path" {:get ['list-attr1]}}
+                    :fern.api/schema {:example/v1.attr {:vase.norm/txes [{:db/ident :attr1
+                                                                          :db/cardinality :db.cardinality/one
+                                                                          :db/valueType :db.type/string
+                                                                          :db/doc "An attribute"
+                                                                          :db.install/_attribute :db.part/db}]}}}})))
