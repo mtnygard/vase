@@ -56,12 +56,14 @@
     with-spec = <'with-spec'> NativeExpr
 
     Query = <'query'> keyword-name QueryClause*
-    <QueryClause> = to | headers | q | params
+    <QueryClause> = to | headers | q | params | edn-coerce | constants
     q = <'q'> NativeExpr
+    constants = <'constants'> NativeExpr
 
     Transact = <'transact'> keyword-name TransactClause*
-    <TransactClause> = to | headers | params | operation
+    <TransactClause> = to | headers | properties | operation
     operation = <'operation'> keyword-name
+    properties = <'properties'> <'['> keyword-name+ <']'>
 
     from = <'from'> keyword-name
     to = <'to'> keyword-name
@@ -126,10 +128,6 @@
   (fn [& args]
     (zipmap (keys m) (map #(apply % args) (vals m)))))
 
-(defn- rename-key
-  [m old new]
-  (dissoc (assoc m new (m old)) old))
-
 (def transforms
   {:integer            #(Integer. %)
    :name               symbolify
@@ -187,12 +185,13 @@
    :Query              (fn [nm & clauses]
                          (lit/map->QueryAction (into {:name nm} clauses)))
    :Transact           (fn [nm & clauses]
-                         (lit/map->TransactAction (rename-key (into {:name nm} clauses) :params :properties)))
+                         (lit/map->TransactAction (into {:name nm} clauses)))
    :HttpClause         hash-map
    :HttpKeyword        (fn [kw] (keyword "io.pedestal.http" kw))
    :NativeExpr         native
    :params             (keyed :params vector)
    :param-with-default (fn [nm default] (vector nm (native default)))
+   :properties         (keyed :properties vector)
    :edn-coerce         (keyed :edn-coerce vector)
    :headers            (keyed :headers maplike)
    :body               (keyed :body identity)

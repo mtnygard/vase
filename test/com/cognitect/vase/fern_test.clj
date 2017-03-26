@@ -256,8 +256,32 @@
                                        [?release :release/name ?rname]]
                              :params [:artist-release-pairs]})
 
+      "query with-everything
+         q     [:find  ?release
+                :in    $ [?aname ?rname]
+                :where [?artist :artist/name ?aname]
+                       [?release :release/artists ?artist]
+                       [?release :release/name ?rname]]
+         edn-coerce [artist-release-pairs]
+         constants [100 101 102]
+         headers {\"Query\" \"with all options\"}
+         to     a-context-key
+         params [artist-release-pairs]"
+      (lit/map->QueryAction {:name       :with-everything
+                             :params     [:artist-release-pairs]
+                             :constants  [100 101 102]
+                             :query      '[:find  ?release
+                                           :in    $ [?aname ?rname]
+                                           :where [?artist :artist/name ?aname]
+                                           [?release :release/artists ?artist]
+                                           [?release :release/name ?rname]]
+                             :to         :a-context-key
+                             :headers    {"Query" "with all options"}
+                             :edn-coerce [:artist-release-pairs]
+                             })
+
       "transact create-user
-         params     [user/email user/name user/country]
+         properties [user/email user/name user/country]
          operation  vase/assert-entity
          headers    {\"Powered-by\" \"Vase\"}
          to         transaction-result"
@@ -268,7 +292,7 @@
                                 :to         :transaction-result})
 
       "transact record-input
-         params [an-input]"
+         properties [an-input]"
       (lit/map->TransactAction {:name :record-input
                                 :properties [:an-input]}))
 
