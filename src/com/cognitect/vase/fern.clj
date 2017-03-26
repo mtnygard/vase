@@ -17,9 +17,9 @@
   (insta/parser
    "Description = Http? | ( Schema | Api | Spec )*
     Http = <'http'> HttpClause*
-    HttpClause = HttpKeyword HttpKeywordVal
+    HttpClause = HttpKeyword NativeExpr
     HttpKeyword = 'allowed-origins' | 'container-options' | 'enable-csrf' | 'enable-session' | 'file-path' | 'host' | 'interceptors' | 'method-param-name' | 'mime-types' | 'not-found-interceptor' | 'port' | 'resource-path' | 'router' | 'secure-headers' | 'type'
-    HttpKeywordVal = s-expr
+    NativeExpr = s-expr
 
     Schema = <'schema'> keyword-name (Attribute | SchemaUse)*
 
@@ -45,21 +45,19 @@
     <RespondClause> = status | params | headers | edn-coerce | body
 
     Redirect = <'redirect'> keyword-name RedirectClause*
-    <RedirectClause> = status | params | headers | body | url-literal | url-expr
+    <RedirectClause> = status | params | headers | body | url
 
     Interceptor = <'interceptor'> keyword-name InterceptorClause*
-    <InterceptorClause> = EnterClause | LeaveClause | ErrorClause
-    EnterClause = <'enter'> s-expr
-    LeaveClause = <'leave'> s-expr
-    ErrorClause = <'error'> s-expr
+    InterceptorClause = InterceptorKeyword NativeExpr
+    InterceptorKeyword = 'enter' | 'leave' | 'error'
 
     Conform = <'conform'> keyword-name ConformClause*
     <ConformClause> = from | to | with-spec
-    with-spec = <'with-spec'> s-expr
+    with-spec = <'with-spec'> NativeExpr
 
     Query = <'query'> keyword-name QueryClause*
     <QueryClause> = to | headers | q | params
-    q = <'q'> s-expr
+    q = <'q'> NativeExpr
 
     Transact = <'transact'> keyword-name TransactClause*
     <TransactClause> = to | headers | params | operation
@@ -73,11 +71,10 @@
     param-with-default = <'['> keyword-name clojure-tok <']'>
     headers = <'headers'> <'{'> ( quotedstring quotedstring )+ <'}'>
     edn-coerce = <'edn-coerce'> <'['> keyword-name+ <']'>
-    body = <'body'> s-expr
-    url-literal = <'url'> quotedstring
-    url-expr = <'url'> s-expr
+    body = <'body'> NativeExpr
+    url = <'url'> NativeExpr
 
-    Spec = <'spec'> keyword-name s-expr
+    Spec = <'spec'> keyword-name NativeExpr
 
     s-expr = list-expr | vec-expr | map-expr | reader-macro | clojure-tok
     list-expr = '(' (s-expr / clojure-tok)* ')'
@@ -170,7 +167,7 @@
 
                               (seq route)
                               (assoc :vase.api/routes (apply merge-with merge (map second route))))}))
-   :Spec               (fn [nm spec] {nm (native spec)})
+   :Spec               hash-map
    :SchemaUse          (keyed :schema identity)
    :SchemaInline       (keyed :schemainline identity)
    :Route              (keyed :route (fn [verb path ints] {path {verb ints}}))
@@ -193,19 +190,16 @@
                          (lit/map->TransactAction (rename-key (into {:name nm} clauses) :params :properties)))
    :HttpClause         hash-map
    :HttpKeyword        (fn [kw] (keyword "io.pedestal.http" kw))
-   :HttpKeywordVal     native
+   :NativeExpr         native
    :params             (keyed :params vector)
    :param-with-default (fn [nm default] (vector nm (native default)))
    :edn-coerce         (keyed :edn-coerce vector)
    :headers            (keyed :headers maplike)
-   :body               (keyed :body native)
-   :url-literal        (keyed :url identity)
-   :url-expr           (keyed :url native)
-   :with-spec          (keyed :spec native)
-   :q                  (keyed :query native)
-   :EnterClause        (keyed :enter native)
-   :LeaveClause        (keyed :leave native)
-   :ErrorClause        (keyed :error native)})
+   :body               (keyed :body identity)
+   :with-spec          (keyed :spec identity)
+   :q                  (keyed :query identity)
+   :InterceptorKeyword keyword
+   :InterceptorClause  hash-map})
 
 (defn transform
   [parse-tree]
