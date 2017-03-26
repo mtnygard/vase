@@ -2,9 +2,10 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [com.cognitect.vase.fern :as fern]
+            [com.cognitect.vase.literals :as lit]
             [instaparse.core :as insta]
-            [io.pedestal.interceptor :as i]
-            [com.cognitect.vase.literals :as lit]))
+            [io.pedestal.http :as http]
+            [io.pedestal.interceptor :as i]))
 
 (defn map-vals
   [f m]
@@ -275,7 +276,48 @@
       (are [input expected] (= expected (fern/parse-string input :Spec))
         "spec example.test/age
           (fn [age] (> age 21))"
-        {:example.test/age '(fn [age] (> age 21))}))))
+        {:example.test/age '(fn [age] (> age 21))}))
+
+
+    ))
+
+(defn block-with-clause [headerline word]
+  (str headerline \newline word \space "(fn [& args] true)"))
+
+(defn accepts [start-rule input]
+  (not (insta/failure? (fern/parse-string input start-rule))))
+
+(deftest test-http-options
+  (testing "basic syntax"
+    (are [input expected] (= expected (fern/parse-string input :Http))
+      "http"
+      {:fern/http {}}
+
+      "http
+           allowed-origins (fn [origin] true)
+           port 8080
+           container-options {:h2c? true}"
+      {:fern/http {::http/allowed-origins '(fn [origin] true)
+                   ::http/port 8080
+                   ::http/container-options '{:h2c? true}}}))
+
+  (testing "all accepted options"
+    (are [input] (accepts :Http (block-with-clause "http" input))
+      "allowed-origins"
+      "container-options"
+      "enable-csrf"
+      "enable-session"
+      "file-path"
+      "host"
+      "interceptors"
+      "method-param-name"
+      "mime-types"
+      "not-found-interceptor"
+      "port"
+      "resource-path"
+      "router"
+      "secure-headers"
+      "type")))
 
 (deftest test-incorporate-by-reference
   (testing "apis can use schemas"
@@ -342,12 +384,7 @@
     "; this is a comment"
     ";\\n\\n\\n\\t\\t\\t\\n     ;     "
     ";\\n"
-    ";;; with more ;;; inside ;;;"
-    )
-  )
-
-
-
+    ";;; with more ;;; inside ;;;"))
 
 (deftest test-comments-blanks-and-trailing-whitespace
   (testing "apis can write schema inline"

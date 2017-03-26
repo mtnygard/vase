@@ -1,7 +1,8 @@
 (ns com.cognitect.vase.fern
-  (:require [instaparse.core :as insta]
+  (:require [clojure.string :as str]
             [com.cognitect.vase.literals :as lit]
-            [clojure.string :as str]))
+            [instaparse.core :as insta]
+            [io.pedestal.http :as http]))
 
 (def ^:private ^:dynamic *input* nil)
 
@@ -14,7 +15,12 @@
 
 (def fern-parser
   (insta/parser
-   "Description = ( Schema | Api | Spec )*
+   "Description = Http? | ( Schema | Api | Spec )*
+    Http = <'http'> HttpClause*
+    HttpClause = HttpKeyword HttpKeywordVal
+    HttpKeyword = 'allowed-origins' | 'container-options' | 'enable-csrf' | 'enable-session' | 'file-path' | 'host' | 'interceptors' | 'method-param-name' | 'mime-types' | 'not-found-interceptor' | 'port' | 'resource-path' | 'router' | 'secure-headers' | 'type'
+    HttpKeywordVal = s-expr
+
     Schema = <'schema'> keyword-name (Attribute | SchemaUse)*
 
     Attribute = <'attribute'> keyword-name cardinality kind toggle* quotedstring
@@ -140,6 +146,8 @@
    :cardinality        keyword
    :kind               keyword
    :toggle             keyword
+   :Http               (fn [& parts]
+                         {:fern/http (reduce merge {} parts)})
    :Schema             (fn [nm & parts]
                          (let [schemas (filter #(= :schema (first %)) parts)
                                attrs   (remove #(= :schema (first %)) parts)]
@@ -152,7 +160,6 @@
                               (assoc :vase.norm/txes attrs))}))
    :Api                (fn [nm & parts]
                          (let [{:keys [route schema schemainline]} (group-by first parts)]
-                           (println :Api :routes route)
                            {nm
                             (cond-> {}
                               (seq schema)
@@ -184,6 +191,9 @@
                          (lit/map->QueryAction (into {:name nm} clauses)))
    :Transact           (fn [nm & clauses]
                          (lit/map->TransactAction (rename-key (into {:name nm} clauses) :params :properties)))
+   :HttpClause         hash-map
+   :HttpKeyword        (fn [kw] (keyword "io.pedestal.http" kw))
+   :HttpKeywordVal     native
    :params             (keyed :params vector)
    :param-with-default (fn [nm default] (vector nm (native default)))
    :edn-coerce         (keyed :edn-coerce vector)
