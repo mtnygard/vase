@@ -5,6 +5,13 @@
 
 (def ^:private ^:dynamic *input* nil)
 
+(def whitespace-or-comments
+  (insta/parser
+   "ws-or-comments = #\"\\s+\" | comments
+    comments = comment+
+    comment = ';' #\".*?(\\n|\\z)\"    "
+   :auto-whitespace :standard))
+
 (def fern-parser
   (insta/parser
    "Description = ( Schema | Api | Spec )*
@@ -80,7 +87,7 @@
     name = ident ( '.' ident )*
     integer = #\"[1-9][0-9]*\"
     <ident> = #'[A-Za-z_][A-Za-z0-9_\\-\\?!$\\%]*'
-"  :auto-whitespace :standard))
+"  :auto-whitespace whitespace-or-comments))
 
 (defn- build-attribute
   [& attr-vec]

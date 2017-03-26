@@ -31,7 +31,7 @@
     (:fern.api/schema api)
     (update :fern.api/schema #(map-vals remove-tempids-from-norm %))))
 
-(deftest parse-fern
+(deftest test-parse-fern
   (testing "names"
     (are [input expected] (= expected (fern/parse-string input :qualified-name))
       "example"              'example
@@ -277,7 +277,7 @@
           (fn [age] (> age 21))"
         {:example.test/age '(fn [age] (> age 21))}))))
 
-(deftest incorporate-by-reference
+(deftest test-incorporate-by-reference
   (testing "apis can use schemas"
     (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/v1
@@ -323,11 +323,42 @@
                           :db.install/_attribute :db.part/db
                           :db/doc                "Ref to a persona enum"}]}})))
 
-(deftest incorporate-inline
+(deftest test-incorporate-inline
   (testing "apis can write schema inline"
     (are [input expected] (= expected (map-vals remove-tempids-from-nested-schema (fern/parse-string input :Api)))
       "api example/v1
          get \"/path\" list-attr1
+         schema example/v1.attr
+           attribute attr1 one string \"An attribute\""
+      {:example/v1 {:vase.api/routes {"/path" {:get ['list-attr1]}}
+                    :fern.api/schema {:example/v1.attr {:vase.norm/txes [{:db/ident :attr1
+                                                                          :db/cardinality :db.cardinality/one
+                                                                          :db/valueType :db.type/string
+                                                                          :db/doc "An attribute"
+                                                                          :db.install/_attribute :db.part/db}]}}}})))
+
+(deftest test-whitespace-or-comment
+  (are [input] (not (insta/failure? (insta/parse fern/whitespace-or-comments input)))
+    "; this is a comment"
+    ";\\n\\n\\n\\t\\t\\t\\n     ;     "
+    ";\\n"
+    ";;; with more ;;; inside ;;;"
+    )
+  )
+
+
+
+
+(deftest test-comments-blanks-and-trailing-whitespace
+  (testing "apis can write schema inline"
+    (are [input expected] (= expected (map-vals remove-tempids-from-nested-schema (fern/parse-string input :Api)))
+      "; This is an inline comment
+       api example/v1
+         ; This is an indented comment
+         get \"/path\" list-attr1
+         ;;; ======================================== ;;;
+         ;;; This is a fancy block comment
+         ;;; ---------------------------------------- ;;;
          schema example/v1.attr
            attribute attr1 one string \"An attribute\""
       {:example/v1 {:vase.api/routes {"/path" {:get ['list-attr1]}}
