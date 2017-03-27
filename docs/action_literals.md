@@ -1,3 +1,18 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Action Literals](#action-literals)
+  - [#vase/respond](#vaserespond)
+  - [#vase/redirect](#vaseredirect)
+  - [#vase/validate](#vasevalidate)
+  - [#vase/conform](#vaseconform)
+  - [#vase/query](#vasequery)
+  - [#vase/transact](#vasetransact)
+  - [#vase/intercept](#vaseintercept)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Action Literals
 
 This page describes the action literals and their parameters. For the

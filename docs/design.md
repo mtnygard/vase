@@ -1,3 +1,47 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Design Documentation and Vision](#design-documentation-and-vision)
+  - [Introduction](#introduction)
+    - [Commonly used terms](#commonly-used-terms)
+- [Vase](#vase)
+  - [Motivation](#motivation)
+  - [Design Goals](#design-goals)
+  - [Design Non-goals](#design-non-goals)
+  - [Prototyping or Production?](#prototyping-or-production)
+- [Design](#design)
+  - [On-demand Container Service](#on-demand-container-service)
+  - [Using Pedestal](#using-pedestal)
+  - [Using Datomic](#using-datomic)
+  - [Concise Description](#concise-description)
+  - [Validation Using Clojure.spec](#validation-using-clojurespec)
+  - [State and data management](#state-and-data-management)
+  - [Reader Literals](#reader-literals)
+- [Norms](#norms)
+  - [Norm Identity](#norm-identity)
+  - [Norm Transactions](#norm-transactions)
+  - [Schema-tx Reader Literal](#schema-tx-reader-literal)
+- [Specs](#specs)
+- [APIs](#apis)
+  - [API Identity](#api-identity)
+  - [API Roots](#api-roots)
+  - [API description](#api-description)
+  - [Input and Output formats](#input-and-output-formats)
+  - [Response status codes and payload navigation](#response-status-codes-and-payload-navigation)
+    - [Routing](#routing)
+    - [Action Map](#action-map)
+    - [Actions](#actions)
+    - [Action-maps](#action-maps)
+- [Operational Attributes](#operational-attributes)
+  - [Failure and reliability](#failure-and-reliability)
+  - [Authorization and external requests](#authorization-and-external-requests)
+  - [Initialization](#initialization)
+  - [Monitoring and logging](#monitoring-and-logging)
+    - [Norms and schemas](#norms-and-schemas)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Design Documentation and Vision
 
 ## Introduction

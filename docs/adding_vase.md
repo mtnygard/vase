@@ -1,3 +1,22 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Adding Vase to a Pedestal project](#adding-vase-to-a-pedestal-project)
+  - [Welcome](#welcome)
+  - [What You Will Learn](#what-you-will-learn)
+  - [Guide Assumptions](#guide-assumptions)
+  - [Step By Step](#step-by-step)
+    - [Step 1: Add the Vase dependency](#step-1-add-the-vase-dependency)
+    - [Step 2: Update `service.clj`](#step-2-update-serviceclj)
+      - [Add the new required namespaces to your `service.clj` ns declaration](#add-the-new-required-namespaces-to-your-serviceclj-ns-declaration)
+      - [Add Vase information to the service map](#add-vase-information-to-the-service-map)
+    - [Step 3: Update `server.clj`](#step-3-update-serverclj)
+    - [Step 4: Create services](#step-4-create-services)
+  - [Wrapping Up](#wrapping-up)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Adding Vase to a Pedestal project
 
 ## Welcome

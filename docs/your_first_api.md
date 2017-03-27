@@ -1,3 +1,28 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Building your first API](#building-your-first-api)
+  - [Welcome](#welcome)
+  - [What You Will Learn](#what-you-will-learn)
+  - [Getting Started](#getting-started)
+  - [Setting Up](#setting-up)
+  - [Up and running](#up-and-running)
+  - [An Accounts System](#an-accounts-system)
+  - [Building the data model](#building-the-data-model)
+  - [Making It Act](#making-it-act)
+  - [Forwarding Headers](#forwarding-headers)
+  - [Try it out](#try-it-out)
+  - [Handling Parameters](#handling-parameters)
+  - [Working with POST data](#working-with-post-data)
+  - [A dangerous truth](#a-dangerous-truth)
+  - [Getting data in with `transact`](#getting-data-in-with-transact)
+  - [Getting data out with `query`](#getting-data-out-with-query)
+  - [Querying `or` and other constants](#querying-or-and-other-constants)
+  - [Wrapping Up](#wrapping-up)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Building your first API
 
 ## Welcome

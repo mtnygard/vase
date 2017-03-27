@@ -1,3 +1,31 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**
+
+- [Fern](#fern)
+  - [Why do we need Fern?](#why-do-we-need-fern)
+  - [Is the EDN format going away?](#is-the-edn-format-going-away)
+  - [Introducing the language](#introducing-the-language)
+  - [Escape Hatch](#escape-hatch)
+  - [Quick Re-fern-erance](#quick-re-fern-erance)
+    - [http](#http)
+    - [schema](#schema)
+      - [Attribute definition](#attribute-definition)
+    - [api](#api)
+      - [Route definition](#route-definition)
+    - [Query - Return data](#query---return-data)
+    - [Transact - Create datoms](#transact---create-datoms)
+    - [Conform - Reshape context data](#conform---reshape-context-data)
+    - [Respond - Build an immediate response](#respond---build-an-immediate-response)
+    - [Redirect - Respond with a new location](#redirect---respond-with-a-new-location)
+  - [Terminal vs. non-terminal interceptors](#terminal-vs-non-terminal-interceptors)
+  - [Use Cases](#use-cases)
+    - [Running from vase.jar](#running-from-vasejar)
+    - [Working with a Service Map](#working-with-a-service-map)
+    - [Working with a Vase descriptor](#working-with-a-vase-descriptor)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Fern
 
 Fern is an input language (external DSL) for Vase. It fills the same
