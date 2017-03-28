@@ -26,19 +26,13 @@ It also important to note that the terms *service*, *server*, *container* are al
 
 ## Setting Up
 
-First, be sure you have a Datomic transactor running. See
-[the Datomic docs](http://docs.datomic.com) to get set up. Note that the
-template project uses Datomic Pro. (You can change the project.clj
-dependency to use Datomic Free. Be sure to make the corresponding
-change in the `:datomic-uri` later.)
-
 Create a new project from the Vase leiningen template:
 
 ```
 lein new vase your-first-api
 ```
 
-## Up and running
+## Up and Running
 
 The exact sequence varies a little bit depending on whether you prefer
 Leiningen or Boot.
@@ -70,7 +64,6 @@ Once the REPL is running, start a dev mode server like this:
 (in-ns 'your-first-api.server)
 (def srv (your-first-api.server/run-dev))
 ```
-
 ### Either way
 
 There will be a lot of logging, but it should end with something like
@@ -122,7 +115,9 @@ file and start a fresh one with these contents:
 ```
 
 This says we have no schema, no APIs, no specs, and nothing will
-run. Not very exciting, is it? It gets better in a bit.
+run. It also uses in-memory "storage" for Datomic so everything
+disappears when you exit the process. Not very exciting, is it? It
+gets better in a bit.
 
 Here are the meanings of the top-level keys:
 

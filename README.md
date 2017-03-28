@@ -41,15 +41,11 @@ Stable versions are currently deployed to the Clojars repository.
 </dependency>
 ```
 
-
 ## Getting Started
 
 By default, Vase uses an in-memory Datomic database, using the
-[publicly available Datomic-free](https://clojars.org/com.datomic/datomic-free)
+[publicly available Datomic Free](https://clojars.org/com.datomic/datomic-free)
 version located in Clojars.
-
-Everything you need to get up and running with Vase is packaged in Vase itself.
-Vase is completely self-contained -- You don't need to setup Datomic or create a MyDatomic account.
 
 ### Using the template
 
@@ -96,26 +92,50 @@ hand-written Pedestal routes by concatenating the input to
      (vase/routes "/api" spec))))
 ```
 
-
 ## Documentation
+
+### About Vase
 
 * [Adding Vase to an existing Pedestal service](./docs/adding_vase.md)
 * [Building Your First API](./docs/your_first_api.md)
 * [Design document](./docs/design.md)
+* [Action literals](./docs/action_literals.md) reference
 
+### About Pedestal
+
+See the [pedestal.io](http://pedestal.io)
+
+### About Datomic
+
+See the [Datomic docs](http://docs.datomic.com) site.
+
+## Support
+
+Help is available on the
+[pedestal-users](https://groups.google.com/d/forum/pedestal-users)
+mailing list and the [#pedestal channel on Clojurians Slack](https://clojurians.slack.com/messages/C0K65B20P/).
 
 ## Contributing
 
 Contributing guidelines for Vase are the same as
 [Pedestal](https://github.com/pedestal/pedestal/blob/master/CONTRIBUTING.md).
 
-For code contribution, you'll need a signed [Cognitect Contributor
+To contribute code, you'll need a signed [Cognitect Contributor
 Agreement](https://secure.echosign.com/public/hostedForm?formid=8JU33Z7A7JX84U).
 For small changes and doc updates, no CA is required.
 
 If you're proposing a significant change, please open an Issue to
 discuss the design of the change before submitting a Pull Request.
 
-## Copyright
+## License
 
-Copyright 2015-2017 Cognitect, Inc. All rights reserved.
+Copyright 2015-2017 Cognitect, Inc.
+
+The use and distribution terms for this software are covered by the
+Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0)
+which can be found in the file [epl-v10.html](epl-v10.html) at the root of this distribution.
+
+By using this software in any fashion, you are agreeing to be bound by
+the terms of this license.
+
+You must not remove this notice, or any other, from this software.
