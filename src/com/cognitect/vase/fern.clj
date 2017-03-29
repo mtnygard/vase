@@ -10,7 +10,7 @@
   (insta/parser
    "ws-or-comments = #\"\\s+\" | comments
     comments = comment+
-    comment = ';' #\".*?(\\n|\\z)\"    "
+    comment = ';' #\".*?(\\n|\\z)\""
    :auto-whitespace :standard))
 
 (def fern-parser
@@ -21,23 +21,21 @@
     HttpKeyword = 'allowed-origins' | 'container-options' | 'enable-csrf' | 'enable-session' | 'file-path' | 'host' | 'interceptors' | 'method-param-name' | 'mime-types' | 'not-found-interceptor' | 'port' | 'resource-path' | 'router' | 'secure-headers' | 'type'
     NativeExpr = s-expr
 
-    Schema = <'schema'> keyword-name (Attribute | SchemaUse)*
+    Schema = <'schema'> keyword-name (Attribute | Require)*
 
+    Require = <'require'> keyword-name
     Attribute = <'attribute'> keyword-name cardinality kind toggle* quotedstring
     cardinality = 'one' | 'many'
     kind = 'long' | 'double' | 'instant' | 'ref' | 'bigint' | 'float' | 'string' | 'keyword' | 'bigdec' | 'bytes' | 'uri' | 'uuid' | 'boolean'
     toggle = 'unique' | 'identity' | 'index' | 'fulltext' | 'component' | 'no-history'
 
-    Api = <'api'> keyword-name (Route / SchemaUse / SchemaInline)*
+    Api = <'api'> keyword-name (Route / Require)*
     Route = Verb Path InterceptQueue
     Verb = 'get' | 'put' | 'post' | 'delete' | 'head' | 'options'
     <Path> = quotedstring
     InterceptQueue = InterceptorRef | InterceptorRefs
     InterceptorRef = qualified-name
     InterceptorRefs = <'['> qualified-name+ <']'>
-
-    SchemaUse = <'schema'> <'use'> keyword-name
-    SchemaInline = Schema
 
     StockInterceptor = Respond | Redirect | Interceptor | Conform | Query | Transact
 
@@ -137,37 +135,35 @@
                          ([ns-part nm-part] (symbol (str ns-part) (str nm-part))))
    :keyword-name       keyword
    :quotedstring       (fn [s] (apply str (drop 1 (butlast s))))
-   :Attribute          build-attribute
+   :Attribute          (keyed :attribute build-attribute)
    :cardinality        keyword
    :kind               keyword
    :toggle             keyword
    :Http               (fn [& parts]
                          {:fern/http (reduce merge {} parts)})
    :Schema             (fn [nm & parts]
-                         (let [schemas (filter #(= :schema (first %)) parts)
-                               attrs   (remove #(= :schema (first %)) parts)]
+                         (let [{:keys [attribute require]} (group-by first parts)]
                            {nm
                             (cond-> {}
-                              (seq schemas)
-                              (assoc :vase.norm/requires (into [] (map second schemas)))
+                              (seq require)
+                              (assoc :vase.norm/requires (into [] (map second require)))
 
-                              (seq attrs)
-                              (assoc :vase.norm/txes attrs))}))
+                              (seq attribute)
+                              (assoc :vase.norm/txes (mapv second attribute)))}))
    :Api                (fn [nm & parts]
-                         (let [{:keys [route schema schemainline]} (group-by first parts)]
+                         (let [{:keys [route schema require]} (group-by first parts)]
                            {nm
                             (cond-> {}
                               (seq schema)
                               (assoc :vase.api/schemas (into [] (map second schema)))
 
-                              (seq schemainline)
-                              (assoc :fern.api/schema (apply merge-with merge (map second schemainline)))
+                              (seq require)
+                              (update :vase.api/schemas #(into (or % []) (mapv second require)))
 
                               (seq route)
                               (assoc :vase.api/routes (apply merge-with merge (map second route))))}))
    :Spec               hash-map
-   :SchemaUse          (keyed :schema identity)
-   :SchemaInline       (keyed :schemainline identity)
+   :Require            (keyed :require identity)
    :Route              (keyed :route (fn [verb path ints] {path {verb ints}}))
    :Verb               keyword
    :InterceptQueue     identity

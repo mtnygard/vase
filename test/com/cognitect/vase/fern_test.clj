@@ -300,10 +300,7 @@
       (are [input expected] (= expected (fern/parse-string input :Spec))
         "spec example.test/age
           (fn [age] (> age 21))"
-        {:example.test/age '(fn [age] (> age 21))}))
-
-
-    ))
+        {:example.test/age '(fn [age] (> age 21))}))))
 
 (defn block-with-clause [headerline word]
   (str headerline \newline word \space "(fn [& args] true)"))
@@ -347,18 +344,18 @@
   (testing "apis can use schemas"
     (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/v1
-         schema use example/schema"
+         require example/schema"
       {:example/v1 {:vase.api/schemas [:example/schema]}}
 
       "api example/v2
-         schema use example/base
-         schema use example/extensions"
+         require example/base
+         require example/extensions"
       {:example/v2 {:vase.api/schemas [:example/base :example/extensions]}}
 
       "api example/v3
-         schema use example/base
+         require example/base
          get \"/users\" list-users
-         schema use store/item
+         require store/item
          get \"/users/:id\" get-user"
       {:example/v3 {:vase.api/schemas [:example/base :store/item]
                     :vase.api/routes  {"/users"     {:get ['list-users]}
@@ -367,13 +364,13 @@
   (testing "schemas can use schemas"
     (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
       "schema example/user
-         schema use example/base"
+         require example/base"
       {:example/user {:vase.norm/requires [:example/base]}}
 
       "schema example/user
-         schema use example/base
+         require example/base
          attribute user/name one string identity \"The user\"
-         schema use persona/enums
+         require persona/enums
          attribute user/persona one ref \"Ref to a persona enum\""
       {:example/user
        {:vase.norm/requires [:example/base :persona/enums]
@@ -389,20 +386,6 @@
                           :db.install/_attribute :db.part/db
                           :db/doc                "Ref to a persona enum"}]}})))
 
-(deftest test-incorporate-inline
-  (testing "apis can write schema inline"
-    (are [input expected] (= expected (map-vals remove-tempids-from-nested-schema (fern/parse-string input :Api)))
-      "api example/v1
-         get \"/path\" list-attr1
-         schema example/v1.attr
-           attribute attr1 one string \"An attribute\""
-      {:example/v1 {:vase.api/routes {"/path" {:get ['list-attr1]}}
-                    :fern.api/schema {:example/v1.attr {:vase.norm/txes [{:db/ident :attr1
-                                                                          :db/cardinality :db.cardinality/one
-                                                                          :db/valueType :db.type/string
-                                                                          :db/doc "An attribute"
-                                                                          :db.install/_attribute :db.part/db}]}}}})))
-
 (deftest test-whitespace-or-comment
   (are [input] (not (insta/failure? (insta/parse fern/whitespace-or-comments input)))
     "; this is a comment"
@@ -411,7 +394,7 @@
     ";;; with more ;;; inside ;;;"))
 
 (deftest test-comments-blanks-and-trailing-whitespace
-  (testing "apis can write schema inline"
+  (testing "comments can go anywhere"
     (are [input expected] (= expected (map-vals remove-tempids-from-nested-schema (fern/parse-string input :Api)))
       "; This is an inline comment
        api example/v1
@@ -420,11 +403,6 @@
          ;;; ======================================== ;;;
          ;;; This is a fancy block comment
          ;;; ---------------------------------------- ;;;
-         schema example/v1.attr
-           attribute attr1 one string \"An attribute\""
+         require example/v1.entities"
       {:example/v1 {:vase.api/routes {"/path" {:get ['list-attr1]}}
-                    :fern.api/schema {:example/v1.attr {:vase.norm/txes [{:db/ident :attr1
-                                                                          :db/cardinality :db.cardinality/one
-                                                                          :db/valueType :db.type/string
-                                                                          :db/doc "An attribute"
-                                                                          :db.install/_attribute :db.part/db}]}}}})))
+                    :vase.api/schemas [:example/v1.entities]}})))
