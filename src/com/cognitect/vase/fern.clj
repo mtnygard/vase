@@ -6,16 +6,16 @@
 
 (def ^:private ^:dynamic *input* nil)
 
-(def whitespace-or-comments
+(def ^:private whitespace-or-comments
   (insta/parser
-   "ws-or-comments = #\"\\s+\" | comments
+   "ws-or-comments = #'\\s+' | comments
     comments = comment+
-    comment = ';' #\".*?(\\n|\\z)\""
+    comment = ';' #'.*?(\\r\\n|\\n|\\z)'"
    :auto-whitespace :standard))
 
-(def fern-parser
+(def ^:private fern-parser
   (insta/parser
-   "Description = Http? | ( Schema | Api | Spec )*
+   "Description = (Http | Schema | Api | Spec | StockInterceptor )*
     Http = <'http'> HttpClause*
     HttpClause = HttpKeyword NativeExpr
     HttpKeyword = 'allowed-origins' | 'container-options' | 'enable-csrf' | 'enable-session' | 'file-path' | 'host' | 'interceptors' | 'method-param-name' | 'mime-types' | 'not-found-interceptor' | 'port' | 'resource-path' | 'router' | 'secure-headers' | 'type'
@@ -124,7 +124,7 @@
   (fn [& args]
     (zipmap (keys m) (map #(apply % args) (vals m)))))
 
-(def transforms
+(def ^:private transforms
   {:integer            #(Integer. %)
    :name               symbolify
    :namespace          symbolify
@@ -141,25 +141,27 @@
                          {:fern/http (reduce merge {} parts)})
    :Schema             (fn [nm & parts]
                          (let [{:keys [attribute require]} (group-by first parts)]
-                           {nm
-                            (cond-> {}
-                              (seq require)
-                              (assoc :vase.norm/requires (into [] (map second require)))
+                           {:vase/norms
+                            {nm
+                             (cond-> {}
+                               (seq require)
+                               (assoc :vase.norm/requires (into [] (map second require)))
 
-                              (seq attribute)
-                              (assoc :vase.norm/txes (mapv second attribute)))}))
+                               (seq attribute)
+                               (assoc :vase.norm/txes (mapv second attribute)))}}))
    :Api                (fn [nm & parts]
                          (let [{:keys [route schema require]} (group-by first parts)]
-                           {nm
-                            (cond-> {}
-                              (seq schema)
-                              (assoc :vase.api/schemas (into [] (map second schema)))
+                           {:vase/apis
+                            {nm
+                             (cond-> {}
+                               (seq schema)
+                               (assoc :vase.api/schemas (into [] (map second schema)))
 
-                              (seq require)
-                              (update :vase.api/schemas #(into (or % []) (mapv second require)))
+                               (seq require)
+                               (update :vase.api/schemas #(into (or % []) (mapv second require)))
 
-                              (seq route)
-                              (assoc :vase.api/routes (apply merge-with merge (map second route))))}))
+                               (seq route)
+                               (assoc :vase.api/routes (apply merge-with merge (map second route))))}}))
    :Spec               hash-map
    :Require            (keyed :require identity)
    :Route              (keyed :route (fn [verb path ints] {path {verb ints}}))
@@ -194,11 +196,32 @@
    :InterceptorKeyword keyword
    :InterceptorClause  hash-map})
 
-(defn transform
+(defn- transform
   [parse-tree]
   (if (insta/failure? parse-tree)
     parse-tree
     (insta/transform transforms parse-tree)))
+
+;;; ========================================
+;;; Syntax helpers
+
+(defn ok? [v] (not (and (map? v) (contains? v :marker-text))))
+
+(defmacro ok?->
+  "Binds name to expr, checks if it is an error. If not, evaluates the
+  first form in the lexical context of that binding, then checks if
+  that evaluates to an error. Repeats for each successive form,
+  returning either the first error or the result of the last form."
+  [expr name & forms]
+  (let [steps (map (fn [step] `(if (ok? ~name) (-> ~name ~step) ~name)) forms)]
+    `(let [~name ~expr
+           ~@(interleave (repeat name) (butlast steps))]
+       ~(if (empty? steps)
+          name
+          (last steps)))))
+
+;;; ========================================
+;;; Public API
 
 (defn parse-string
   "Parses the contents of a string as 'Fern' language for defining

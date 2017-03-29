@@ -26,6 +26,10 @@
     (:vase.norm/txes norm)
     (update :vase.norm/txes remove-tempids)))
 
+(defn- remove-tempids-from-norms
+  [norms]
+  (map-vals remove-tempids-from-norm norms))
+
 (defn- remove-tempids-from-nested-schema
   [api]
   (cond-> api
@@ -60,94 +64,103 @@
       [:params [[:with-default 0] :no-default [:string-default "s"]]]))
 
   (testing "schema fragments"
-    (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
+    (are [input expected] (= expected (map-vals remove-tempids-from-norms (fern/parse-string input :Schema)))
       "schema example/base"
-      {:example/base {}}
+      {:vase/norms
+       {:example/base {}}}
 
       "schema example/base
          attribute user/name one string \"This is a doc\""
-      {:example/base
-       {:vase.norm/txes
-        [{:db/ident              :user/name
-          :db/valueType          :db.type/string
-          :db/cardinality        :db.cardinality/one
-          :db.install/_attribute :db.part/db
-          :db/doc                "This is a doc"}]}}
+      {:vase/norms
+       {:example/base
+        {:vase.norm/txes
+         [{:db/ident              :user/name
+           :db/valueType          :db.type/string
+           :db/cardinality        :db.cardinality/one
+           :db.install/_attribute :db.part/db
+           :db/doc                "This is a doc"}]}}}
 
       "schema with-toggles
        attribute people.user/username one string identity fulltext no-history \"An attribute with toggles\""
-      {:with-toggles
-       {:vase.norm/txes
-        [{:db/index              true
-          :db/unique             :db.unique/identity
-          :db/valueType          :db.type/string
-          :db/noHistory          true
-          :db.install/_attribute :db.part/db
-          :db/fulltext           true
-          :db/cardinality        :db.cardinality/one
-          :db/doc                "An attribute with toggles"
-          :db/ident              :people.user/username}]}}
+      {:vase/norms
+       {:with-toggles
+        {:vase.norm/txes
+         [{:db/index              true
+           :db/unique             :db.unique/identity
+           :db/valueType          :db.type/string
+           :db/noHistory          true
+           :db.install/_attribute :db.part/db
+           :db/fulltext           true
+           :db/cardinality        :db.cardinality/one
+           :db/doc                "An attribute with toggles"
+           :db/ident              :people.user/username}]}}}
 
       "schema multiple-attributes
          attribute user/id one long \"Numeric ID\"
          attribute user/name one string \"Printable\"
          attribute user/friends many ref \"Connections\""
-      {:multiple-attributes
-       {:vase.norm/txes
-        [{:db/ident              :user/id
-          :db/valueType          :db.type/long
-          :db/cardinality        :db.cardinality/one
-          :db.install/_attribute :db.part/db
-          :db/doc                "Numeric ID"}
-         {:db/ident              :user/name
-          :db/valueType          :db.type/string
-          :db/cardinality        :db.cardinality/one
-          :db.install/_attribute :db.part/db
-          :db/doc                "Printable"}
-         {:db/ident              :user/friends
-          :db/valueType          :db.type/ref
-          :db/cardinality        :db.cardinality/many
-          :db.install/_attribute :db.part/db
-          :db/doc                "Connections"}]}}))
+      {:vase/norms
+       {:multiple-attributes
+        {:vase.norm/txes
+         [{:db/ident              :user/id
+           :db/valueType          :db.type/long
+           :db/cardinality        :db.cardinality/one
+           :db.install/_attribute :db.part/db
+           :db/doc                "Numeric ID"}
+          {:db/ident              :user/name
+           :db/valueType          :db.type/string
+           :db/cardinality        :db.cardinality/one
+           :db.install/_attribute :db.part/db
+           :db/doc                "Printable"}
+          {:db/ident              :user/friends
+           :db/valueType          :db.type/ref
+           :db/cardinality        :db.cardinality/many
+           :db.install/_attribute :db.part/db
+           :db/doc                "Connections"}]}}}))
 
   (testing "api fragments"
     (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/user"
-      {:example/user {}}
+      {:vase/apis
+       {:example/user {}}}
 
       "api example/one-route
         get \"/foo\"  one-interceptor"
-      {:example/one-route
-       {:vase.api/routes
-        {"/foo" {:get ['one-interceptor]}}}}
+      {:vase/apis
+       {:example/one-route
+        {:vase.api/routes
+         {"/foo" {:get ['one-interceptor]}}}}}
 
       "api example/one-route
         get \"/foo\"  [an-interceptor another-interceptor]"
-      {:example/one-route
-       {:vase.api/routes
-        {"/foo" {:get ['an-interceptor 'another-interceptor]}}}}
+      {:vase/apis
+       {:example/one-route
+        {:vase.api/routes
+         {"/foo" {:get ['an-interceptor 'another-interceptor]}}}}}
 
       "api example/verbs
         get  \"/foo\" one-action
         put  \"/foo\" different-action
         post \"/foo\" other-action"
-      {:example/verbs
-       {:vase.api/routes
-        {"/foo" {:get ['one-action]
-                 :put ['different-action]
-                 :post ['other-action]}}}}
+      {:vase/apis
+       {:example/verbs
+        {:vase.api/routes
+         {"/foo" {:get ['one-action]
+                  :put ['different-action]
+                  :post ['other-action]}}}}}
 
       "api multiple/routes
         get \"/users\" list-users
         post \"/users\" create-user
         get \"/users/:id\" show-user
         delete \"/users/:id\" delete-user"
-      {:multiple/routes
-       {:vase.api/routes
-        {"/users"     {:get  ['list-users]
-                       :post ['create-user]}
-         "/users/:id" {:get    ['show-user]
-                       :delete ['delete-user]}}}}))
+      {:vase/apis
+       {:multiple/routes
+        {:vase.api/routes
+         {"/users"     {:get  ['list-users]
+                        :post ['create-user]}
+          "/users/:id" {:get    ['show-user]
+                        :delete ['delete-user]}}}}}))
 
   (testing "stock interceptors"
     (are [input expected] (= expected (fern/parse-string input :StockInterceptor))
@@ -345,52 +358,58 @@
     (are [input expected] (= expected (fern/parse-string input :Api))
       "api example/v1
          require example/schema"
-      {:example/v1 {:vase.api/schemas [:example/schema]}}
+      {:vase/apis {:example/v1 {:vase.api/schemas [:example/schema]}}}
 
       "api example/v2
          require example/base
          require example/extensions"
-      {:example/v2 {:vase.api/schemas [:example/base :example/extensions]}}
+      {:vase/apis {:example/v2 {:vase.api/schemas [:example/base :example/extensions]}}}
 
       "api example/v3
          require example/base
          get \"/users\" list-users
          require store/item
          get \"/users/:id\" get-user"
-      {:example/v3 {:vase.api/schemas [:example/base :store/item]
-                    :vase.api/routes  {"/users"     {:get ['list-users]}
-                                       "/users/:id" {:get ['get-user]}}}}))
+      {:vase/apis {:example/v3 {:vase.api/schemas [:example/base :store/item]
+                                :vase.api/routes  {"/users"     {:get ['list-users]}
+                                                   "/users/:id" {:get ['get-user]}}}}}))
 
   (testing "schemas can use schemas"
-    (are [input expected] (= expected (map-vals remove-tempids-from-norm (fern/parse-string input :Schema)))
+    (are [input expected] (= expected (map-vals remove-tempids-from-norms (fern/parse-string input :Schema)))
       "schema example/user
          require example/base"
-      {:example/user {:vase.norm/requires [:example/base]}}
+      {:vase/norms
+       {:example/user
+        {:vase.norm/requires [:example/base]}}}
 
       "schema example/user
          require example/base
          attribute user/name one string identity \"The user\"
          require persona/enums
          attribute user/persona one ref \"Ref to a persona enum\""
-      {:example/user
-       {:vase.norm/requires [:example/base :persona/enums]
-        :vase.norm/txes [{:db/ident              :user/name
-                          :db/valueType          :db.type/string
-                          :db/cardinality        :db.cardinality/one
-                          :db.install/_attribute :db.part/db
-                          :db/doc                "The user"
-                          :db/unique             :db.unique/identity}
-                         {:db/ident              :user/persona
-                          :db/valueType          :db.type/ref
-                          :db/cardinality        :db.cardinality/one
-                          :db.install/_attribute :db.part/db
-                          :db/doc                "Ref to a persona enum"}]}})))
+      {:vase/norms
+       {:example/user
+        {:vase.norm/requires [:example/base :persona/enums]
+         :vase.norm/txes [{:db/ident              :user/name
+                           :db/valueType          :db.type/string
+                           :db/cardinality        :db.cardinality/one
+                           :db.install/_attribute :db.part/db
+                           :db/doc                "The user"
+                           :db/unique             :db.unique/identity}
+                          {:db/ident              :user/persona
+                           :db/valueType          :db.type/ref
+                           :db/cardinality        :db.cardinality/one
+                           :db.install/_attribute :db.part/db
+                           :db/doc                "Ref to a persona enum"}]}}})))
 
 (deftest test-whitespace-or-comment
-  (are [input] (not (insta/failure? (insta/parse fern/whitespace-or-comments input)))
+  (are [input] (not (insta/failure? (fern/parse-string input)))
+    ""
+    ";; use pedestal.views"
     "; this is a comment"
-    ";\\n\\n\\n\\t\\t\\t\\n     ;     "
-    ";\\n"
+    ";\n\n\n\t\t\t\n     ;     "
+    ";\r\n\r\n\r\n\t\t\t\r\n   ;   "
+    ";; use this \n"
     ";;; with more ;;; inside ;;;"))
 
 (deftest test-comments-blanks-and-trailing-whitespace
@@ -404,5 +423,45 @@
          ;;; This is a fancy block comment
          ;;; ---------------------------------------- ;;;
          require example/v1.entities"
-      {:example/v1 {:vase.api/routes {"/path" {:get ['list-attr1]}}
-                    :vase.api/schemas [:example/v1.entities]}})))
+      {:vase/apis
+       {:example/v1
+        {:vase.api/routes {"/path" {:get ['list-attr1]}}
+         :vase.api/schemas [:example/v1.entities]}}})))
+
+(deftest whole-documents
+  (are [input expected] (= expected (fern/parse-string input))
+    ""
+    [:Description]
+
+
+    "http
+       port 8080"
+    [:Description {:fern/http {::http/port 8080}}]
+
+    ";; a sample
+     http
+       port 8080"
+    [:Description {:fern/http {::http/port 8080}}]
+
+    "http port 8080
+      type :jetty
+
+    schema example/base"
+    [:Description
+     {:fern/http
+      {::http/port 8080
+       ::http/type :jetty}}
+     {:vase/norms
+      {:example/base
+       {}}}]
+
+
+    "http
+     api myapp
+       get \"/pets\"  list-pets"
+    [:Description
+     {:fern/http {}}
+     {:vase/apis
+      {:myapp
+       {:vase.api/routes
+        {"/pets" {:get '[list-pets]}}}}}]))
