@@ -105,10 +105,8 @@
 
 (defn- snip-input
   [node]
-  (when-let [m (meta node)]
-    (read-string (subs *input*
-                       (inc (:instaparse.gll/start-index m))
-                       (:instaparse.gll/end-index m)))))
+  (when-let [[start end] (insta/span node)]
+    (read-string (subs *input* (inc start) end))))
 
 (defn- native
   ([expr]
