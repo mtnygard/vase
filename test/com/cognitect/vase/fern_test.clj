@@ -76,6 +76,19 @@
     (is (contains? resulting-ctx :markers))
     (is (= 3 (count (:markers resulting-ctx))))))
 
+(deftest test-http-block
+  (testing "happy path"
+    (are [input expected] (= expected (get (fern/parse-and-process input) :vase/service-map))
+      "http port 8080 end"               {:port "8080"}
+      "http port 49152 end"              {:port "49152"}
+      "http host \"my.example.com\" end" {:host "\"my.example.com\""}
+      ))
+  (testing "rejections"
+    (are [input expected-markers] (= expected-markers (get (fern/parse-and-process input) :markers))
+      "http no-such-kw end"              [{:line 1 :column 6 :source-text "no-such-kw"}]
+
+      )))
+
 (deftest test-parse-fern
   (testing "names"
     (are [input expected] (= expected (fern/parse-string input :qualified-name))

@@ -16,8 +16,9 @@
 
 (defn- source-text
   [node]
+  (println (str "getting source text for") node ":" (insta/span node) "'" (subs *input* (first (insta/span node)) (second (insta/span node))) "'")
   (when-let [[start end] (insta/span node)]
-    (subs *input* start end)))
+    (subs *input* (inc start) end)))
 
 (def ^:private whitespace-or-comments
   (insta/parser
@@ -65,14 +66,20 @@
 (defn node->marker
   [node marker-text]
   (let [m (meta node)]
-    (marker (:instaparse.gll/start-line m)
-            (:instaparse.gll/start-column m)
-            marker-text
-            (source-text node))))
+    (merge
+     m
+     (marker (:instaparse.gll/start-line m)
+             (:instaparse.gll/start-column m)
+             marker-text
+             (source-text node)))))
+
+(defn attach-marker
+  [context marker]
+  (update context :markers #(conj (or % []) marker)))
 
 (defn attach-marker-about
   [context node s]
-  (update-in context [:markers] #(conj (or % []) (node->marker node s))))
+  (attach-marker context (node->marker node s)))
 
 (defn block-type [b] (get-in b [:type :tag]))
 
@@ -98,6 +105,40 @@
         (let [ast (transformed-blocks (insta/add-line-and-column-info-to-metadata input ast))
               ctx (initial-context)]
           (process-blocks ctx ast))))))
+
+(defn renamespace
+  [k nm]
+  {:pre [(keyword? k) (symbol? nm)]}
+  (keyword (str nm) (name k)))
+
+(defn body->keyword-map
+  [where allowed-keyword? parts]
+  (loop [result {}
+         markers []
+         parts parts]
+    (if (seq parts)
+      (let [[[_ k :as w1] [_ v :as w2]] (take 2 parts)]
+        (if (nil? w2)
+          (recur result (conj markers (node->marker w1 "There was an extra keyword with no value.")) (drop 2 parts))
+          (if (allowed-keyword? (keyword k))
+            (recur (assoc result (keyword k) v) markers (drop 2 parts))
+            (recur result (node->marker w1  (str "An " where " block doesn't allow " k " as a keyword. I'm ignoring it.")) (drop 2 parts)))))
+      [result markers])))
+
+(def ^:private http-keywords
+  #{:allowed-origins :router :resource-path
+    :method-param-name :secure-headers :type
+    :port :host :enable-session :enable-csrf
+    :file-path :interceptors :container-options
+    :not-found-interceptor :mime-types})
+
+(defmethod process-block "http"
+  [context input]
+  (let [[result markers] (body->keyword-map "http" http-keywords (:body input))]
+    (cond-> (assoc context :vase/service-map result)
+
+      (seq markers)
+      (update :markers conj markers))))
 
 (def ^:private fern-parser
   (insta/parser
