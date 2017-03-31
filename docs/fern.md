@@ -62,6 +62,7 @@ api example/exchange-rate
   get "/rates" list-rates
   get "/rates/:currency-pair" lookup-rate
   put "/rates/:currency-pair" [authenticated? authorized? post-rate]
+end
 ```
 
 Let's break that down a bit. The first line declares a Vase API. An
@@ -92,6 +93,7 @@ query list-rates
      :where [?xing :exchange/ccy1 ?ccy1]
             [?xing :exchange/ccy2 ?ccy2]
             [?xing :exchange/rate ?rate]]
+end
 ```
 
 The first line in this block says we're using a query interceptor. The
@@ -131,6 +133,7 @@ interceptor com.example/track-invocation
   enter (fn [ctx] (assoc ctx :enter-was-called true))
   leave (fn [ctx] (assoc ctx :leave-was-called true))
   error (fn [ctx] (assoc ctx :error-was-called true))
+end
 ```
 
 Fern doesn't allow you to create new top-level functions or embed
@@ -160,6 +163,7 @@ Sample:
 http
   port 80
   api use com.example/users
+end
 ```
 
 Options: All options are as described in the
@@ -196,14 +200,15 @@ Sample:
 schema foo/bar
   schema use foo/other
   attribute bar-length one long "Length of the bar, in cubits"
+end
 ```
 
 Options:
 
-| Option name             | Meaning |
-|-------------------------|---------|
-| `attribute`       | An attribute definition as described below |
-| `schema use`      | Reference to the name of another schema that should be transacted before this one |
+| Option name   | Meaning |
+|---------------|---------|
+| `attribute`   | An attribute definition as described below |
+| `require`     | Reference to the name of another schema that should be transacted before this one |
 
 #### Attribute definition
 
@@ -230,17 +235,18 @@ Sample
 
 ```
 api gamify/v1
-  schema use my-cool-schema
+  require my-cool-schema
   interceptors [valid-user? valid-game?]
   get "/highscore/:user/:game" achievements
   put "/highscore/:user/:game" [detect-cheats post-score]
+end
 ```
 
 Options:
 
 | Option name | Meaning |
 |-------------|---------|
-| `schema use` | Reference to the name of a schema that should be transacted before using this API |
+| `require`   | Reference to the name of a schema that should be transacted before using this API |
 | `interceptors` | An interceptor name or vector of interceptor names that shold be prepended to every route's specific interceptors |
 | `get`, `put,` `post`, `options`, `delete`, `head` | Define a route as described below |
 
@@ -263,6 +269,7 @@ query list-rates
      :where [?xing :exchange/ccy1 ?ccy1]
             [?xing :exchange/ccy2 ?ccy2]
             [?xing :exchange/rate ?rate]]
+end
 ```
 
 Options:
@@ -282,6 +289,7 @@ Sample
 transact com.example/add-puppies
   operation assert-entity
   properties [puppy/breed puppy/name]
+end
 ```
 
 Options:
@@ -302,6 +310,7 @@ conform
   from a-context-key
   with-spec (s/and string? #(.startsWith % "test-"))
   to other-key
+end
 ```
 
 Options:
@@ -320,6 +329,7 @@ Sample
 respond
   status 200
   body "This is a body"
+end
 ```
 
 Options:
@@ -335,8 +345,9 @@ Options:
 ### Redirect - Respond with a new location
 
 ```
-respond
+redirect
   url "www.google.com"
+end
 ```
 
 Options:
@@ -364,9 +375,14 @@ Some interceptors make sense only in the terminal (i.e., final) position in a ch
 
 ## Use Cases
 
-Fern goes in a text file. Depending on how you call the parser, you
-either get back a full Pedestal service map, already started, or you
-get a Vase descriptor.
+Fern data goes in a text file. Your application calls a loader
+function to get back a service map. It will be a full Pedestal service
+map, ready to start. Of course, your application can modify it from
+there.
+
+One extra key will be added to the service map:
+`:com.cognitect.vase/descriptor` will have the full data structure of
+the descriptor available.
 
 ### Running from vase.jar
 
@@ -380,8 +396,8 @@ This runs the same code as shown in the next section.
 
 ### Working with a Service Map
 
-Fern can produce the whole service map if you call
-`vase.fern/load-service`. That service is ready to start with
+Fern produces the service map when you call
+`com.cognitect.vase.fern/load`. That service is ready to start with
 Pedestal.
 
 ```clojure
@@ -422,12 +438,10 @@ Just those two files are enough to start a server. It's not going to
 do anything but serve static files from the classpath, but it's a
 start.
 
-### Working with a Vase descriptor
+### Dealing with Input Errors
 
-The function `com.cognitect.vase.fern/load-descriptor` loads a Fern
-file and returns it. In the event of any problems, Fern returns a map
-with the key `:markers` bound to a vector of marker maps. Each map
-has:
+In the event of any problems, Fern returns a map with the key
+`:markers` bound to a vector of marker maps. Each map has:
 
    * `:line` - The line number where the problem occurred.
    * `:column` - The column number where the problem occurred.
@@ -438,17 +452,3 @@ has:
 
 Most of the time, you'll want to log any problems that arise in
 processing the file.
-
-Here is an example of using a descriptor within your own service map:
-
-```
-(defn service
-  [fern-path]
-  (let [descriptor (fern/load-descriptor fern-path)]
-    {::http/port   80
-     ::http/routes (conj app-routes (vase/routes descriptor))
-     ::http/join?  (not dev-mode)
-     ::http/type   :jetty}))
-```
-
-Notice that `vase/routes` is called as usual.

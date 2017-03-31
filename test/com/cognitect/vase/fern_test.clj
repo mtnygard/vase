@@ -36,6 +36,46 @@
     (:fern.api/schema api)
     (update :fern.api/schema #(map-vals remove-tempids-from-norm %))))
 
+(deftest test-block-parser
+  (testing "names"
+    (are [rule input expected] (= expected (fern/parsed-blocks input :start rule))
+      :word        "example"                                [:word "example"]
+      :word        "example-thing"                          [:word "example-thing"]
+      :list-expr   "(1 2)"                                  [:list-expr [:word "1"] [:word "2"]]
+      :list-expr   "()"                                     [:list-expr]
+      :map-expr    "{:a 1 :b 2}"                            [:map-expr [:word ":a"] [:word "1"] [:word ":b"] [:word "2"]]
+      :map-expr    "{}"                                     [:map-expr]
+      :vec-expr    "[1 2]"                                  [:vec-expr [:word "1"] [:word "2"]]
+      :vec-expr    "[]"                                     [:vec-expr]
+      :list-expr   "([1 2] {:a 1})"                         [:list-expr [:vec-expr [:word "1"] [:word "2"]] [:map-expr [:word ":a"] [:word "1"]]]
+      :native-expr "<<foo>>"                                [:native-expr "<<foo>>"]
+      :Block       "foo end"                                [:Block [:blocktype "foo"] [:body [:end]]]
+      :File        "foo end bar end"                        [:File [:Block [:blocktype "foo"] [:body [:end]]] [:Block [:blocktype "bar"] [:body [:end]]]]
+      :Block       "foo zort quux end"                      [:Block [:blocktype "foo"] [:body [:word "zort"] [:word "quux"] [:end]]]
+      :Block       "foo zort 8080 quux <<(fn [_] 0)>> end"  [:Block [:blocktype "foo"] [:body [:word "zort"] [:word "8080"] [:word "quux"] [:native-expr "<<(fn [_] 0)>>"] [:end]]]
+      :Block       "foo zort <<(fn [_] end)>> end"          [:Block [:blocktype "foo"] [:body [:word "zort"] [:native-expr "<<(fn [_] end)>>"] [:end]]])))
+
+(deftest test-block-transformer
+  (are [input expected] (= expected (fern/transformed-blocks input))
+    [:native-expr "<<(fn [_] end)>>"]
+    [:native-expr '(fn [_] end)]
+
+    [:Block [:blocktype "foo"]]
+    {:type {:tag "foo"}}
+
+    [:Block [:blocktype "foo"] [:body [:word "zort"] [:word "quux"] [:end]]]
+    {:type {:tag "foo"}
+     :body [[:word "zort"] [:word "quux"]]}
+
+    [:Block [:blocktype "foo"] [:body [:native-expr "<<(fn [ctx] (map (fn [v] (inc v)) (:vals ctx)))>>"] [:end]]]
+    {:type {:tag "foo"}
+     :body [[:native-expr '(fn [ctx] (map (fn [v] (inc v)) (:vals ctx)))]]}))
+
+(deftest test-block-processor-invocation
+  (let [resulting-ctx (fern/parse-and-process "foo end bar end baz end")]
+    (is (contains? resulting-ctx :markers))
+    (is (= 3 (count (:markers resulting-ctx))))))
+
 (deftest test-parse-fern
   (testing "names"
     (are [input expected] (= expected (fern/parse-string input :qualified-name))
@@ -433,7 +473,6 @@
     ""
     [:Description]
 
-
     "http
        port 8080"
     [:Description {:fern/http {::http/port 8080}}]
@@ -455,7 +494,6 @@
       {:example/base
        {}}}]
 
-
     "http
      api myapp
        get \"/pets\"  list-pets"
@@ -465,3 +503,20 @@
       {:myapp
        {:vase.api/routes
         {"/pets" {:get '[list-pets]}}}}}]))
+
+(defmacro compare-parse-failure
+  [expected actual]
+  `(let [exp# ~expected
+         act# ~actual]
+     (and
+      (= (select-keys act# [:line :column :source-text])
+         (select-keys exp# [:line :column :source-text]))
+      (not= nil (re-find (:marker-text exp#) (:marker-text act#))))))
+
+(deftest parse-errors-are-reported
+  (are [input expected-marker] (compare-parse-failure expected-marker (fern/parse-string input))
+    "not-a-top-level-directive 9000"
+    {:line   1
+     :column 1
+     :source-text "not-a-top-level-directive 9000"
+     :marker-text #"^Parse error at line 1, column 1.*"}))
