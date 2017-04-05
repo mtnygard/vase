@@ -10,7 +10,11 @@
 
 (defn- map-keys
   [f m]
-  (zipmap (map f (keys m)) (vals m)))
+  (with-meta (zipmap (map f (keys m)) (vals m)) (meta m)))
+
+(defn- map-vals
+  [f m]
+  (with-meta (zipmap (keys m) (map f (vals m))) (meta m)))
 
 (defn- renamespace
   "Move a key from one namespace to another. `nm` may be a symbol or
@@ -25,6 +29,9 @@
 
 ;; ========================================
 ;; Markers communicate where there are problems in the input.
+
+(defn marker? [v]
+  (and (map? v) (contains? v :marker-text)))
 
 (defn- pprint-failure
   [{:keys [line column text]}]
@@ -46,6 +53,10 @@
            :marker-text marker-text
            :source-text (source-text node))))
 
+(defn exception->marker
+  [node exception]
+  (node->marker node (.getMessage exception)))
+
 (defn attach-marker
   [context marker]
   (update context :markers #(conj (or % []) marker)))
@@ -61,15 +72,22 @@
 
 (def ^:private ^:dynamic *input* nil)
 
-(defn- snip-input
-  [node]
-  (when-let [[start end] (insta/span node)]
-    (read-string (subs *input* (inc start) end))))
-
 (defn- source-text
   [node]
   (when-let [[start end] (insta/span node)]
     (subs *input* (inc start) end)))
+
+(defn- read-expr
+  [node]
+  (try
+    (read-string (source-text node))
+    (catch Exception ex
+        (exception->marker node ex))))
+
+(defn- snip-input
+  [node]
+  (when-let [[start end] (insta/span node)]
+    (read-string (subs *input* (inc start) end))))
 
 ;; ========================================
 ;; One level of parser eliminates comments and whitespace
@@ -150,11 +168,14 @@
          markers []
          parts parts]
     (if (seq parts)
-      (let [[[_ k :as w1] [_ v :as w2]] (take 2 parts)]
+      (let [[[_ k :as w1] w2] (take 2 parts)]
         (if (nil? w2)
           (recur result (conj markers (node->marker w1 "There was an extra keyword with no value.")) (drop 2 parts))
           (if (allowed-keyword? (keyword k))
-            (recur (assoc result (keyword k) v) markers (drop 2 parts))
+            (let [v (read-expr w2)]
+              (if (marker? v)
+                (recur result (conj markers v) (drop 2 parts))
+                (recur (assoc result (keyword k) v) markers (drop 2 parts))))
             (recur result (node->marker w1  (str "An " where " block doesn't allow " k " as a keyword. I'm ignoring it.")) (drop 2 parts)))))
       [result markers])))
 
@@ -410,8 +431,6 @@
 
 ;;; ========================================
 ;;; Public API
-
-(defn marker? [v] (contains? v :marker-text))
 
 (defn parse-string
   "Parses the contents of a string as 'Fern' language for defining

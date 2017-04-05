@@ -89,23 +89,33 @@
 
 (defn- discrepancies
   [coll1 coll2]
-  (remove empty
+  (remove empty?
         (map difference coll1 coll2)))
 
 (deftest test-http-block
   (testing "happy path"
     (are [input expected] (= expected (get (fern/parse-and-process input) :vase/service-map))
-      "http port 8080 end"               {:port "8080"}
-      "http port 49152 end"              {:port "49152"}
-      "http host \"my.example.com\" end" {:host "\"my.example.com\""}
-      ))
+      "http port 8080 end"               {:port 8080}
+      "http port 49152 end"              {:port 49152}
+      "http host \"my.example.com\" end" {:host "my.example.com"}
+      "http method-param-name \"_verb\" resource-path \"public\" end" {:method-param-name "_verb" :resource-path "public"}))
   (testing "rejections"
     (are [input expected-markers] (= [] (discrepancies expected-markers (get (fern/parse-and-process input) :markers)))
       "http no-such-kw end"              [{:start-line 1
                                            :start-column 5
                                            :end-line 1
                                            :end-column 16
-                                           :source-text "no-such-kw"}])))
+                                           :source-text "no-such-kw"}]
+      "http port end"                    [{:start-line 1
+                                           :start-column 5
+                                           :end-line 1
+                                           :end-column 10
+                                           :source-text "port"}]
+      "http port 8080+9090 end"          [{:start-line 1
+                                           :start-column 10
+                                           :end-line 1
+                                           :end-column 20
+                                           :source-text "8080+9090"}])))
 
 (deftest test-parse-fern
   (testing "names"
