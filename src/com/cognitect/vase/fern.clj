@@ -4,8 +4,60 @@
             [com.cognitect.vase :as vase]
             [com.cognitect.vase.literals :as lit]
             [instaparse.core :as insta]
+            [instaparse.gll :as gll]
             [instaparse.failure :as insta-failure]
             [io.pedestal.http :as http]))
+
+(defn- map-keys
+  [f m]
+  (zipmap (map f (keys m)) (vals m)))
+
+(defn- renamespace
+  "Move a key from one namespace to another. `nm` may be a symbol or
+  nil. If nil, the new keyword has no namespace part."
+  ([k]
+   (renamespace k nil))
+  ([k nm]
+   {:pre [(keyword? k) (or (symbol? nm) (nil? nm))]}
+   (if nm
+     (keyword (str nm) (name k))
+     (keyword (name k)))))
+
+;; ========================================
+;; Markers communicate where there are problems in the input.
+
+(defn- pprint-failure
+  [{:keys [line column text]}]
+  (str/join \newline
+            [(str "Parse error at line " line ", column " column ":")
+             text
+             (insta-failure/marker column)]))
+
+(defn- insta-failure->marker
+  [f]
+  (assoc (map-keys renamespace f)
+         :marker-text  (pprint-failure f)
+         :source-text  (:text f)))
+
+(defn node->marker
+  [node marker-text]
+  (let [m (meta node)]
+    (assoc (map-keys renamespace m)
+           :marker-text marker-text
+           :source-text (source-text node))))
+
+(defn attach-marker
+  [context marker]
+  (update context :markers #(conj (or % []) marker)))
+
+(defn attach-marker-about
+  [context node s]
+  (attach-marker context (node->marker node s)))
+
+;; ========================================
+;; Native expressions get clipped out of the original input, after we
+;; use the parser to figure out where the native expressions actually
+;; are.
 
 (def ^:private ^:dynamic *input* nil)
 
@@ -16,9 +68,11 @@
 
 (defn- source-text
   [node]
-  (println (str "getting source text for") node ":" (insta/span node) "'" (subs *input* (first (insta/span node)) (second (insta/span node))) "'")
   (when-let [[start end] (insta/span node)]
     (subs *input* (inc start) end)))
+
+;; ========================================
+;; One level of parser eliminates comments and whitespace
 
 (def ^:private whitespace-or-comments
   (insta/parser
@@ -26,6 +80,10 @@
     comments = comment+
     comment = ';' #'.*?(\\r\\n|\\n|\\z)'"
    :auto-whitespace :standard))
+
+;; ========================================
+;; The next level of parser splits the input into "blocks" which each
+;; start with a keyword and end with the string 'end'.
 
 (def parsed-blocks
   (insta/parser
@@ -53,33 +111,10 @@
 
 (def transformed-blocks (partial insta/transform block-transformations))
 
-(defn marker
-  ([line column marker-text source-text]
-   (marker line column marker-text source-text []))
-  ([line column marker-text source-text references]
-   {:line        line
-    :column      column
-    :marker-text marker-text
-    :source-text source-text
-    :references  references}))
-
-(defn node->marker
-  [node marker-text]
-  (let [m (meta node)]
-    (merge
-     m
-     (marker (:instaparse.gll/start-line m)
-             (:instaparse.gll/start-column m)
-             marker-text
-             (source-text node)))))
-
-(defn attach-marker
-  [context marker]
-  (update context :markers #(conj (or % []) marker)))
-
-(defn attach-marker-about
-  [context node s]
-  (attach-marker context (node->marker node s)))
+;; ========================================
+;; Each block is processed (after parsing) separately. Processors
+;; dispatch on the initial keyword via a multimethod. New block types
+;; can be introduced by adding methods.
 
 (defn block-type [b] (get-in b [:type :tag]))
 
@@ -94,7 +129,7 @@
   {:pre [(map? context) (vector? input) (= :File (first input))]}
   (reduce process-block context (rest input)))
 
-(defn initial-context []  {})
+(def initial-context {})
 
 (defn parse-and-process
   [input]
@@ -102,17 +137,15 @@
     (let [ast (parsed-blocks input)]
       (if-let [failure (insta/get-failure ast)]
         (insta-failure->marker failure)
-        (let [ast (transformed-blocks (insta/add-line-and-column-info-to-metadata input ast))
-              ctx (initial-context)]
-          (process-blocks ctx ast))))))
+        (let [ast (transformed-blocks (insta/add-line-and-column-info-to-metadata input ast))]
+          (process-blocks initial-context ast))))))
 
-(defn renamespace
-  [k nm]
-  {:pre [(keyword? k) (symbol? nm)]}
-  (keyword (str nm) (name k)))
+;; ========================================
+;; These are API functions that block processors can use to make their
+;; jobs easier.
 
 (defn body->keyword-map
-  [where allowed-keyword? parts]
+  [parts where allowed-keyword? describe-allowed]
   (loop [result {}
          markers []
          parts parts]
@@ -125,6 +158,9 @@
             (recur result (node->marker w1  (str "An " where " block doesn't allow " k " as a keyword. I'm ignoring it.")) (drop 2 parts)))))
       [result markers])))
 
+;; ========================================
+;; Handle the builtin 'http' block
+
 (def ^:private http-keywords
   #{:allowed-origins :router :resource-path
     :method-param-name :secure-headers :type
@@ -134,11 +170,16 @@
 
 (defmethod process-block "http"
   [context input]
-  (let [[result markers] (body->keyword-map "http" http-keywords (:body input))]
+  (let [[result markers] (body->keyword-map (:body input) "http" http-keywords (str "Allowed keywords are " (str/join ", " (map name http-keywords))))]
     (cond-> (assoc context :vase/service-map result)
-
       (seq markers)
-      (update :markers conj markers))))
+      (update :markers into markers))))
+
+;; ========================================
+;; From here down is the original version of the parser. It's here for
+;; reference and to keep the tests passing until I finish migrating to
+;; the new design.
+
 
 (def ^:private fern-parser
   (insta/parser
@@ -329,19 +370,6 @@
     parse-tree
     (insta/transform transforms parse-tree)))
 
-(defn- pprint-failure
-  [{:keys [line column text]}]
-
-  (str/join \newline
-            [(str "Parse error at line " line ", column " column ":")
-             text
-             (insta-failure/marker column)]))
-
-(defn- insta-failure->marker
-  [f]
-  (assoc f
-         :marker-text (pprint-failure f)
-         :source-text (:text f)))
 
 ;;; ========================================
 ;;; Syntax helpers

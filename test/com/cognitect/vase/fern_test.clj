@@ -5,7 +5,8 @@
             [com.cognitect.vase.literals :as lit]
             [instaparse.core :as insta]
             [io.pedestal.http :as http]
-            [io.pedestal.interceptor :as i]))
+            [io.pedestal.interceptor :as i]
+            [clojure.set :as set]))
 
 (defn map-vals
   [f m]
@@ -76,6 +77,21 @@
     (is (contains? resulting-ctx :markers))
     (is (= 3 (count (:markers resulting-ctx))))))
 
+(defn- difference [a b]
+  (let [projection (select-keys b (keys a))]
+    (reduce-kv
+     (fn [m k v]
+       (cond
+         (= v (get m k))  (dissoc m k)
+         (not (contains? m k)) (assoc m k :missing)
+         :else m))
+     projection a)))
+
+(defn- discrepancies
+  [coll1 coll2]
+  (remove empty
+        (map difference coll1 coll2)))
+
 (deftest test-http-block
   (testing "happy path"
     (are [input expected] (= expected (get (fern/parse-and-process input) :vase/service-map))
@@ -84,10 +100,12 @@
       "http host \"my.example.com\" end" {:host "\"my.example.com\""}
       ))
   (testing "rejections"
-    (are [input expected-markers] (= expected-markers (get (fern/parse-and-process input) :markers))
-      "http no-such-kw end"              [{:line 1 :column 6 :source-text "no-such-kw"}]
-
-      )))
+    (are [input expected-markers] (= [] (discrepancies expected-markers (get (fern/parse-and-process input) :markers)))
+      "http no-such-kw end"              [{:start-line 1
+                                           :start-column 5
+                                           :end-line 1
+                                           :end-column 16
+                                           :source-text "no-such-kw"}])))
 
 (deftest test-parse-fern
   (testing "names"
