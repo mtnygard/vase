@@ -30,6 +30,8 @@
 ;; ========================================
 ;; Markers communicate where there are problems in the input.
 
+(declare source-text)
+
 (defn marker? [v]
   (and (map? v) (contains? v :marker-text)))
 
