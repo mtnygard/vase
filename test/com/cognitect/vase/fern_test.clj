@@ -117,6 +117,13 @@
                                            :end-column 20
                                            :source-text "8080+9090"}])))
 
+(deftest test-schema-block
+  (testing "with attributes"
+    (are [input expected] (= expected (get (fern/parse-and-process input) :vase/norms :not-found))
+      "schema my-schema end" {:my-schema {}}
+
+      )))
+
 (deftest test-parse-fern
   (testing "names"
     (are [input expected] (= expected (fern/parse-string input :qualified-name))

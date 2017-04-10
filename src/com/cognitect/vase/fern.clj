@@ -115,11 +115,12 @@
     body = (native-expr | body-token)* end
     native-expr = #\"<<.*?>>\"
 
-    <body-token> =  !('end' | '<<' | '>>') (list-expr | vec-expr | map-expr | word)
+    <body-token> =  !('end' | '<<' | '>>') (list-expr | vec-expr | map-expr | word | quotedstring)
     list-expr = <'('> (body-token / word)* <')'>
     vec-expr = <'['> (body-token / word)* <']'>
     map-expr = <'{'> (body-token / word)* <'}'>
-    word = #\"[#a-zA-Z?'.:_\\-0-9*+$&%^.,/\\\"<>=]+\"" :auto-whitespace whitespace-or-comments))
+    word = #\"[#a-zA-Z?'.:_\\-0-9*+$&%^.,/\\\"<>=]+\"
+    quotedstring = #'\"[^\"]*\"'" :auto-whitespace whitespace-or-comments))
 
 (def ^:private block-transformations
   {:native-expr (fn [s] [:native-expr (read-string (subs s 2 (- (count s) 2)))])
@@ -164,11 +165,59 @@
 ;; These are API functions that block processors can use to make their
 ;; jobs easier.
 
+
+(defn guard*
+  ([final] final)
+  ([guard binding else & more]
+   `(if ~guard
+      (let ~binding
+        ~(apply guard* more))
+      ~else)))
+
+(defmacro guarded->
+  "[[guard binding else]* final-expr]
+
+  Apply a series of tests and transformations, with an exit value
+  allowed at each point.  Each guard must be a single expression. All
+  previous bindings are in scope for following guards. A binding takes
+  the same form as a let-binding.
+
+  If a guard fails, the whole expression will evaluate to the `else`
+  expression for that guard. All previous bindings are in scope for
+  the else, but _not_ the binding whose guard failed.
+
+  Once all guards and bindings are evaluated, `final-expr` will be
+  evaluated and its value returned."
+  [& forms] (apply guard* forms))
+
+(defn keyword-named-block
+  "Extract a keyword name from a block. The name must be the second
+  thing in the block (following the blocktype tag) and must be a :word
+  element from the block parser.
+
+  Returns either a keyword or a marker."
+  [block]
+  (let [kind (block-type block)]
+    (guarded->
+     (not (empty? (:body block)))
+     [body (:body block)]
+     (node->marker block (str "A " kind " block needs a name after the '" kind "' keyword"))
+
+     (seq? body)
+     [word (first body)]
+     (node->marker body (str "A " kind "'s body must have a name"))
+
+     (= :word (first word))
+     [nm (second word)]
+     (node->marker word (str "The name of a " kind " block must resemble a Clojure keyword without the leading ':'"))
+
+     (keyword nm))))
+
 (defn body->keyword-map
   [parts where allowed-keyword? describe-allowed]
-  (loop [result {}
+  (loop [result  {}
          markers []
-         parts parts]
+         parts   parts]
     (if (seq parts)
       (let [[[_ k :as w1] w2] (take 2 parts)]
         (if (nil? w2)
@@ -197,6 +246,32 @@
     (cond-> (assoc context :vase/service-map result)
       (seq markers)
       (update :markers into markers))))
+
+;; ========================================
+;; Handle the builtin 'schema' block
+
+(def ^:private schema-keywords
+  #{:attr})
+
+(defn- schema-attr
+  [input]
+  (take-while #(not= :quotedstring (first %)) input))
+
+(defmethod process-block "schema"
+  [context input]
+  (let [name-or-marker (keyword-named-block input)]
+    (guarded->
+     (not (marker? name-or-marker))
+     [nm name-or-marker]
+     (attach-marker context name-or-marker)
+
+     (seq? (rest (:body input)))
+     [remainder (rest (:body input))]
+     (assoc context :vase/norms {nm {}})
+
+     (doto remainder println)
+     )
+))
 
 ;; ========================================
 ;; From here down is the original version of the parser. It's here for
