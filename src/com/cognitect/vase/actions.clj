@@ -332,40 +332,44 @@
   name (string) to header value (string). May be nil."
   [code-gen query variables coercions constants headers to]
   (assert (or (nil? headers) (map? headers)) (str "Headers should be a map. I got " headers))
-  (let [args-sym  (gensym 'args)
-        to        (or to ::query-data)
-        coercions (into #{} coercions)]
-    `(fn [{~'request :request :as ~'context}]
-       (let [~args-sym      (merged-parameters ~'request)
-             vals#          ~(mapv
-                              (fn [x]
-                                (let
-                                    [[k-sym default-v] (if (vector? x) x [x nil])
-                                     k (util/ensure-keyword k-sym)]
-                                    (if (contains? coercions k-sym)
-                                      `(coerce-arg-val ~args-sym ~k ~default-v)
-                                      `(get ~args-sym ~k ~default-v))))
-                              variables)
-             ~'query-params (concat vals# ~constants)
-             query-result#  (when (every? some? ~'query-params)
-                              (apply ~(query-expr code-gen) ~(list `quote query) (:db ~'request) ~'query-params))
-             missing-params?# (not (every? some? ~'query-params))
-             ~'response-body (cond
-                              missing-params?#          (str
-                                                         "Missing required query parameters; One or more parameters was `nil`."
-                                                         "  Got: " (keys ~args-sym)
-                                                         "  Required: " ~(mapv util/ensure-keyword variables))
-                              (hash-set? query-result#) (into [] query-result#)
-                              :else                     query-result#)
-             resp#          (response/response
-                             ~'response-body
-                             ~headers
-                             (if query-result#
-                               (response/status-code ~'response-body (:errors ~'context))
-                               400))]
-         (if (empty? (:io.pedestal.interceptor.chain/queue ~'context))
-           (assoc ~'context :response resp#)
-           ~(assoc-or-assoc-in 'context to 'response-body))))))
+  (let [request-sym       (gensym 'request)
+        context-sym       (gensym 'context)
+        args-sym          (gensym 'args)
+        to                (or to ::query-data)
+        coercions         (into #{} coercions)
+        query-params-sym  (gensym 'query-params)
+        response-body-sym (gensym 'response-body)]
+    `(fn [{~request-sym :request :as ~context-sym}]
+       (let [~args-sym          (merged-parameters ~request-sym)
+             vals#              ~(mapv
+                                   (fn [x]
+                                     (let
+                                         [[k-sym default-v] (if (vector? x) x [x nil])
+                                          k                 (util/ensure-keyword k-sym)]
+                                       (if (contains? coercions k-sym)
+                                         `(coerce-arg-val ~args-sym ~k ~default-v)
+                                         `(get ~args-sym ~k ~default-v))))
+                                   variables)
+             ~query-params-sym  (concat vals# ~constants)
+             query-result#      (when (every? some? ~query-params-sym)
+                                  (apply ~(query-expr code-gen) ~(list `quote query) (:db ~request-sym) ~query-params-sym))
+             missing-params?#   (not (every? some? ~query-params-sym))
+             ~response-body-sym (cond
+                                  missing-params?#          (str
+                                                              "Missing required query parameters; One or more parameters was `nil`."
+                                                              "  Got: " (keys ~args-sym)
+                                                              "  Required: " ~(mapv util/ensure-keyword variables))
+                                  (hash-set? query-result#) (into [] query-result#)
+                                  :else                     query-result#)
+             resp#              (response/response
+                                  ~response-body-sym
+                                  ~headers
+                                  (if query-result#
+                                    (response/status-code ~response-body-sym (:errors ~context-sym))
+                                    400))]
+         (if (empty? (:io.pedestal.interceptor.chain/queue ~context-sym))
+           (assoc ~context-sym :response resp#)
+           ~(assoc-or-assoc-in context-sym to response-body-sym))))))
 
 (comment
 
