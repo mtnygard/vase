@@ -144,14 +144,15 @@
   are returned for every HTTP request."
   [params edn-coerce body status headers]
   (assert (or (nil? headers) (map? headers)) (str "Headers should be a map. I got " headers))
-  (let [[request context] (gensyms request context)]
+  (let [[request context] (gensyms request context)
+        coercions         (mapv util/ensure-keyword (or edn-coerce []))
+        body              (or body "")
+        status            (or status 200)]
     `(fn [{~request :request :as ~context}]
        (let [req-params#    (merged-parameters ~request)
-             ~(bind params) (coerce-params req-params# ~(mapv util/ensure-keyword (or edn-coerce [])))
-             resp#          (response/response
-                              ~(or body "")
-                              ~headers
-                              ~(or status 200))]
+             req-params#    (coerce-params req-params# ~coercions)
+             ~(bind params) req-params#
+             resp#          (response/response ~body ~headers ~status)]
          (assoc ~context :response resp#)))))
 
 (comment
@@ -181,14 +182,17 @@
   redirect response."
   [params body status headers url]
   (assert (or (nil? headers) (map? headers)) (str "Headers should be a map. I got " headers))
-  (let [[request context] (gensyms request context)]
+  (let [[request context] (gensyms request context)
+        body              (or body "")
+        status            (or status 302)
+        url               (or url "")]
     `(fn [{~request :request :as ~context}]
        (let [req-params#    (merged-parameters ~request)
              ~(bind params) req-params#
              resp#          (response/response
-                              ~(or body "")
-                              (merge ~headers {"Location" ~(or url "")})
-                              ~(or status 302))]
+                              ~body
+                              (merge ~headers {"Location" ~url})
+                              ~status)]
          (assoc ~context :response resp#)))))
 
 (defrecord RedirectAction [name params body status headers url]
@@ -205,21 +209,25 @@
 (defmethod print-method RedirectAction [t ^java.io.Writer w]
   (.write w (str "#vase/redirect" (into {} t))))
 
+(defn detect-problems
+  [spec params]
+  (mapv #(dissoc % :pred)
+    (:clojure.spec.alpha/problems
+     (clojure.spec.alpha/explain-data spec params))))
+
 (defn validate-action-exprs
   "Return code for a Pedestal interceptor function that performs
   clojure.spec.alpha validation on the parameters."
   [params headers spec request-params-path]
   (assert (or (nil? headers) (map? headers)) (str "Headers should be a map. I got " headers))
-  (let [[request context] (gensyms request context)]
+  (let [[request context] (gensyms request context)
+        param-lookup      (if request-params-path
+                            `(get-in ~request ~request-params-path)
+                            `(merged-parameters ~request))]
     `(fn [{~request :request :as ~context}]
-       (let [req-params#    ~(if request-params-path
-                               `(get-in ~request ~request-params-path)
-                               `(merged-parameters ~request))
+       (let [req-params#    ~param-lookup
              ~(bind params) req-params#
-             problems#      (mapv
-                              #(dissoc % :pred)
-                              (:clojure.spec.alpha/problems
-                               (clojure.spec.alpha/explain-data ~spec req-params#)))
+             problems#      (detect-problems ~spec req-params#)
              resp#          (response/response
                               problems#
                               ~headers
@@ -339,36 +347,36 @@
   [code-gen query variables coercions constants headers to]
   (assert (or (nil? headers) (map? headers)) (str "Headers should be a map. I got " headers))
   (let [[request context args query-params response-body] (gensyms request context args query-params response-body)
-        to                (or to ::query-data)
-        coercions         (into #{} coercions)]
+        to                                                (or to ::query-data)
+        coercions                                         (into #{} coercions)]
     `(fn [{~request :request :as ~context}]
-       (let [~args          (merged-parameters ~request)
-             vals#              ~(mapv
-                                   (fn [x]
-                                     (let
-                                         [[k-sym default-v] (if (vector? x) x [x nil])
-                                          k                 (util/ensure-keyword k-sym)]
-                                       (if (contains? coercions k-sym)
-                                         `(coerce-arg-val ~args ~k ~default-v)
-                                         `(get ~args ~k ~default-v))))
-                                   variables)
-             ~query-params  (concat vals# ~constants)
-             query-result#      (when (every? some? ~query-params)
-                                  (apply ~(query-expr code-gen) ~(list `quote query) (:db ~request) ~query-params))
-             missing-params?#   (not (every? some? ~query-params))
-             ~response-body (cond
-                                  missing-params?#          (str
-                                                              "Missing required query parameters; One or more parameters was `nil`."
-                                                              "  Got: " (keys ~args)
-                                                              "  Required: " ~(mapv util/ensure-keyword variables))
-                                  (hash-set? query-result#) (into [] query-result#)
-                                  :else                     query-result#)
-             resp#              (response/response
-                                  ~response-body
-                                  ~headers
-                                  (if query-result#
-                                    (response/status-code ~response-body (:errors ~context))
-                                    400))]
+       (let [~args            (merged-parameters ~request)
+             vals#            ~(mapv
+                                 (fn [x]
+                                   (let
+                                       [[k-sym default-v] (if (vector? x) x [x nil])
+                                        k                 (util/ensure-keyword k-sym)]
+                                     (if (contains? coercions k-sym)
+                                       `(coerce-arg-val ~args ~k ~default-v)
+                                       `(get ~args ~k ~default-v))))
+                                 variables)
+             ~query-params    (concat vals# ~constants)
+             query-result#    (when (every? some? ~query-params)
+                                (apply ~(query-expr code-gen) ~(list `quote query) (:db ~request) ~query-params))
+             missing-params?# (not (every? some? ~query-params))
+             ~response-body   (cond
+                                missing-params?#          (str
+                                                            "Missing required query parameters; One or more parameters was `nil`."
+                                                            "  Got: " (keys ~args)
+                                                            "  Required: " ~(mapv util/ensure-keyword variables))
+                                (hash-set? query-result#) (into [] query-result#)
+                                :else                     query-result#)
+             resp#            (response/response
+                                ~response-body
+                                ~headers
+                                (if query-result#
+                                  (response/status-code ~response-body (:errors ~context))
+                                  400))]
          (if (empty? (:io.pedestal.interceptor.chain/queue ~context))
            (assoc ~context :response resp#)
            ~(assoc-or-assoc-in context to response-body))))))
@@ -468,21 +476,23 @@
   [code-gen properties db-op headers to]
   (assert (or (nil? headers) (map? headers)) (str "Headers should be a map. I got " headers))
   (let [[request context response-body] (gensyms request context response-body)
-        to                (or to ::transact-data)]
+        to                              (or to ::transact-data)
+        processor                       (tx-processor db-op)
+        tx-expr                         (transact-expr code-gen)]
     `(fn [{~request :request :as ~context}]
-       (let [args#              (mapv
-                                  #(into {} (filter second (select-keys % ~(vec properties))))
-                                  (get-in ~request [:json-params :payload]))
-             tx-data#           (~(tx-processor db-op) args#)
-             conn#              (:conn ~request)
-             ~response-body (~(transact-expr code-gen)
-                                 conn#
-                                 tx-data#
-                                 args#)
-             resp#              (response/response
-                                  ~response-body
-                                  ~headers
-                                  (response/status-code ~response-body (:errors ~context)))]
+       (let [args#          (mapv
+                              #(into {} (filter second (select-keys % ~(vec properties))))
+                              (get-in ~request [:json-params :payload]))
+             tx-data#       (~processor args#)
+             conn#          (:conn ~request)
+             ~response-body (~tx-expr
+                             conn#
+                             tx-data#
+                             args#)
+             resp#          (response/response
+                              ~response-body
+                              ~headers
+                              (response/status-code ~response-body (:errors ~context)))]
          (if (empty? (:io.pedestal.interceptor.chain/queue ~context))
            (assoc ~context :response resp#)
            (assoc-in
