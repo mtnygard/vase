@@ -1,0 +1,28 @@
+* Common to all actions
+- Build a fn
+- Eval interceptor map vals
+- Print for round-trip as literal (complected with data-readers.clj)
+
+* Should be common to all actions
+- Header handling
+- Params map
+
+* Data creating / transforming actions
+- "To" and "From"
+
+* Asymmetries
+| Action    | Params? | Uses Merged Params? | Coerces? | Can chain? | Can respond? | Supports to? | Supports from? |
+|-----------+---------+---------------------+----------+------------+--------------+--------------+----------------|
+| Respond   | Yes     | Yes                 | Yes      | No         | Yes          | No           | No             |
+| Redirect  | Yes     | Yes                 | No       | No         | Yes          | No           | No             |
+| Validate  | Yes     | Yes [3]             | No       | Yes [2]    | Yes          | No           | No             |
+| Query     | Yes [1] | Yes                 | Yes [1]  | Yes        | Yes          | Yes          | No             |
+| Conform   | No      | No                  | No       | Yes        | No           | Yes          | Yes            |
+| Transact  | No      | No                  | No       | Yes        | Yes          | Yes          | No             |
+| Intercept | -       | -                   | -        | -          | -            | -            | -              |
+| Attach    | No      | No                  | No       | Yes        | No           | No           | No             |
+
+[1] Feature exists but differs from other implementations
+[2] Chains to next interceptor but discards any problems detected.
+[3] Only uses merged params when =request-params-path= not
+specified. (Request-params-path is similar to =:from=)
