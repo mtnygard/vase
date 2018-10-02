@@ -485,10 +485,7 @@
                               (get-in ~request [:json-params :payload]))
              tx-data#       (~processor args#)
              conn#          (:conn ~request)
-             ~response-body (~tx-expr
-                             conn#
-                             tx-data#
-                             args#)
+             ~response-body (~tx-expr conn# tx-data# args#)
              resp#          (response/response
                               ~response-body
                               ~headers
