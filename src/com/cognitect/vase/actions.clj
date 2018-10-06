@@ -34,6 +34,7 @@
             [datomic.api :as d]
             [datomic.client.api :as client]
             [io.pedestal.interceptor :as i]
+            [io.pedestal.interceptor.chain :as chain]
             [com.cognitect.vase.edn :as edn]
             [com.cognitect.vase.util :as util]
             [com.cognitect.vase.response :as response])
@@ -261,6 +262,12 @@
   (list (if (vector? wheresym) `assoc-in `assoc)
     mapsym wheresym valsym))
 
+(defn- attach
+  [m where val]
+  (if (vector? where)
+    (assoc-in m where val)
+    (assoc    m where val)))
+
 (defn conform-action-exprs
   "Return code for a Pedestal interceptor function that performs
   spec validation on the data attached at `from`. If the data
@@ -413,16 +420,63 @@
            nil))
   )
 
+(def ^:private self (comp first ::chain/stack))
+(def ^:private more-interceptors? (comp not empty? ::chain/queue))
+
+(defn- apply-coercions
+  [params vals coercions]
+  (mapv
+    (fn [x]
+      (let
+          [[k-sym default-v] (if (vector? x) x [x nil])
+           k                 (util/ensure-keyword k-sym)]
+        (if (contains? coercions k-sym)
+          (coerce-arg-val vals k default-v)
+          (get vals k default-v))))
+    params))
+
+(defn- query-action
+  [context]
+  (let [this            (self context)
+        request         (:request context)
+        args            (merged-parameters request)
+        vals            (apply-coercions (:params this) args (set (:edn-coerce this)))
+        query-params    (concat vals (:constants this))
+        missing-params? (not (every? some? query-params))
+        query-result    (when-not missing-params?
+                          (apply (:query-fn this) (:query this) (:db request) query-params))
+        response-body   (cond
+                          missing-params?          (str
+                                                     "Missing required query parameters; One or more parameters was `nil`."
+                                                     "  Got: " (keys args)
+                                                     "  Required: " (mapv util/ensure-keyword (:params this)))
+                          (hash-set? query-result) (into [] query-result)
+                          :else                    query-result)
+        resp            (response/response
+                          response-body
+                          (:headers this)
+                          (if query-result
+                            (response/status-code response-body (:errors context))
+                            400))]
+    (if (more-interceptors? context)
+      (attach context (:to this) response-body)
+      (assoc context :response resp))))
+
 (defrecord QueryAction [name params query edn-coerce constants headers to doc]
   i/IntoInterceptor
   (-interceptor [this]
-    (dynamic-interceptor
-     name
-     {:enter
-      (query-action-exprs (peer-code-gen) query params (into #{} edn-coerce) constants headers to)
-
-      :action-literal
-      :vase.datomic/query})))
+    (i/interceptor
+      {:name           name
+       :params         params
+       :query          query
+       :edn-coerce     edn-coerce
+       :constants      constants
+       :headers        headers
+       :to             to
+       :doc            doc
+       :enter          query-action
+       :query-fn       d/q
+       :action-literal :vase.datomic/query})))
 
 (defmethod print-method QueryAction [t ^java.io.Writer w]
   (.write w (str "#vase.datomic/query" (into {} t))))
