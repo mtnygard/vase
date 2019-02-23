@@ -1,4 +1,5 @@
 (ns com.cognitect.vase.fern
+  (:refer-clojure :exclude [load])
   (:require [com.cognitect.vase.api :as a]
             [com.cognitect.vase.interceptor :as vinterceptor]
             [com.cognitect.vase.try :refer [try->]]
@@ -13,7 +14,8 @@
             [io.pedestal.interceptor :as i]
             [datomic.api :as d]
             [com.cognitect.vase.literals :as literals]
-            [io.pedestal.log :as log])
+            [io.pedestal.log :as log]
+            [clojure.java.io :as io])
   (:import [clojure.lang IObj]))
 
 (defn- synthetic-interceptor-name
@@ -128,11 +130,11 @@
    (expose-as-env stock-interceptor-syms)
    (constructed-stock-interceptors)))
 
-(defn load-from-file
-  [filename]
-  (-> filename
-      (fe/load-environment 'vase/plugins)
-      (merge (stock-interceptors))))
+(defn load
+  [reader path]
+  (merge
+    (fe/load reader path ['vase/plugins])
+    (stock-interceptors)))
 
 (defn prepare-service
   ([environment]
@@ -142,44 +144,21 @@
        (f/evaluate service-key)
        (a/service-map))))
 
-(def vase-fern-url "https://github.com/cognitect-labs/vase/blob/master/docs/vase_and_fern.md")
+(defn- reader-on-file-or-resource [path]
+  (when-let [f (or (io/file path) (io/resource path))]
+    (io/reader f)))
 
-(defn -main [& args]
-  (let [[filename & stuff] args]
-    (if (or (not filename) (not (empty? stuff)))
-      (println "Usage: vase _filename_\n\nVase takes exactly one filename, which must be in Fern format.\nSee " vase-fern-url "  for details.")
-      (when-let [prepared-service-map (try
-                                        (-> filename
-                                            (load-from-file)
-                                            (prepare-service))
-                                        (catch Throwable t
-                                          (fe/print-evaluation-exception t)
-                                          nil))]
-        (try
-          (a/start-service prepared-service-map)
-          (catch Throwable t
-            (fe/print-other-exception t filename)))))))
+(defn server
+  [path]
+  (try-> path
+    reader-on-file-or-resource
+    (:! java.io.IOException ioe (fe/print-other-exception ioe path))
 
+    (load path)
+    (:! java.io.IOException ioe (fe/print-other-exception ioe path))
 
+    prepare-service
+    (:! Throwable t (fe/print-evaluation-exception t))
 
-(comment
-
-  (def filename "test/resources/test_descriptor.fern")
-
-  srv
-
-  (def srv
-    (try->
-     filename
-     load-from-file
-     (:! java.io.IOException ioe (fe/print-other-exception ioe filename))
-
-     prepare-service
-     (:! Throwable t (fe/print-evaluation-exception t))
-
-     a/start-service
-     (:! Throwable t (fe/print-other-exception t filename))))
-
-  (http/stop srv)
-
-  )
+    a/start-service
+    (:! Throwable t (fe/print-other-exception t path))))

@@ -216,13 +216,15 @@ structure. Just use vase.jar directly.
 
 The other way to use it when you embed Vase in your project. In that
 case, the new API functions are
-`com.cognitect.vase.fern/load-from-file` and
+`com.cognitect.vase.fern/load` and
 `com.cognitect.vase.fern/prepare-service`. You can use them like this:
 
 ```
       (when-let [prepared-service-map (try
                                         (-> filename
-                                            (load-from-file)
+                                            io/file
+                                            io/reader
+                                            (load)
                                             (prepare-service))
                                         (catch Throwable t
                                           (fe/print-evaluation-exception t)
@@ -246,7 +248,9 @@ There's a macro called `try->` that makes this look a little nicer:
 ```
     (try->
      filename
-     load-from-file
+     io/file
+     io/reader
+     load
      (:! java.io.IOException ioe (fe/print-other-exception ioe filename))
 
      prepare-service
@@ -263,7 +267,9 @@ Of course, if you're already happy with your error handling, then just let the f
 ```
     (->
      filename
-     load-from-file
+     io/file
+     io/reader
+     load
      prepare-service
      api/start-service)
 ```

@@ -1,14 +1,17 @@
 (ns {{namespace}}.service
-  (:require [com.cognitect.vase.try :as try :refer [try->]]
-            [fern.easy :as fe]
-            [com.cognitect.vase.fern :as fern]
-            [com.cognitect.vase.api :as a])
-  (:gen-class))
+    (:require [com.cognitect.vase.try :as try :refer [try->]]
+              [fern.easy :as fe]
+              [com.cognitect.vase.fern :as fern]
+              [com.cognitect.vase.api :as a]
+              [clojure.java.io :as io])
+    (:gen-class))
 
 (defn run-server
   [filename & {:as opts}]
   (try-> filename
-         fern/load-from-file
+         io/file
+         io/reader
+         fern/load
          (:! java.io.FileNotFoundException fnfe (fe/print-error-message (str "File not found: " (pr-str (.getMessage fnfe)))))
 
          fern/prepare-service

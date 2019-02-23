@@ -4,6 +4,7 @@
                                     :service-map @http-options})
 
  http-options            {:io.pedestal.http/port      @port
+                          :io.pedestal.http/join?     false
                           :io.pedestal.http/file-path "/public"}
 
  port                    8080

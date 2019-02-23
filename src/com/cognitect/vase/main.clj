@@ -27,7 +27,7 @@
                :filename)]
     (when (and file (not= ::try/exit file))
       (try-> file
-             fern/load-from-file
+             fern/load
              (:! java.io.FileNotFoundException fnfe (fe/print-error-message (str "File not found: " (pr-str (.getMessage fnfe)))))
 
              fern/prepare-service
