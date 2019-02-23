@@ -13,7 +13,7 @@
                  [io.pedestal/pedestal.service "0.5.4"]
                  [io.pedestal/pedestal.jetty "0.5.4"]
 
-                 [com.cognitect/fern "0.1.3"]
+                 [com.cognitect/fern "0.1.6-SNAPSHOT"]
 
                  ;; Nice errors
                  [expound "0.3.1"]
