@@ -8,5 +8,5 @@
          io.pedestal/pedestal.service {:mvn/version "0.5.4"}
          io.pedestal/pedestal.jetty   {:mvn/version "0.5.4"}
 
-         com.cognitect/fern {:mvn/version "0.1.5"}}
+         com.cognitect/fern {:mvn/version "0.1.6-SNAPSHOT"}}
  :aliases {:repl {:extra-paths ["test" "test/resources"]}}}
