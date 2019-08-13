@@ -20,8 +20,6 @@
                  [org.eclipse.jetty/jetty-util "9.4.10.v20180503"]
                  [org.eclipse.jetty/jetty-client "9.4.10.v20180503"]
 
-                 [com.cognitect/fern "0.1.6-SNAPSHOT"]
-
                  ;; Pin core.async to avoid conflict between Datomic and Pedestal
                  [org.clojure/core.async "0.4.474"]
 
@@ -32,7 +30,7 @@
                  [joda-time "2.8.2"]
 
                  ;; Configuration
-                 [com.cognitect/fern "0.1.5"]
+                 [com.cognitect/fern "0.1.6"]
 
                  ;; Replace Java EE module for JDK 11
                  [javax.xml.bind/jaxb-api "2.3.0"]
